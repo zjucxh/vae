@@ -3,4 +3,4 @@ Variatonal AutoEncoder
 
 ## TODO
 - Load cloth_in_wind dataset(done)
-- Validate reconstruction loss
+- Modify reconstruction loss to signed distance loss
