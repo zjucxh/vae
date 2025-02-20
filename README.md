@@ -2,4 +2,5 @@
 Variatonal AutoEncoder
 
 ## TODO
-Load cloth_in_wind dataset
+- Load cloth_in_wind dataset(done)
+- Validate reconstruction loss
