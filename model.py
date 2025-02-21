@@ -2,13 +2,17 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
+from torchvision.models import resnet18
 
 class ResNetBlock(nn.Module):
     def __init__(self, dim):
         super(ResNetBlock, self).__init__()
         self.block = nn.Sequential(
             nn.Linear(dim, dim),
-            nn.ReLU(),
+            # weigth normalization
+            #nn.utils.parametrizations.weight_norm(nn.Linear(dim, dim)),
+            nn.LeakyReLU(),
+            #nn.Dropout(0.5)
             #nn.Linear(dim, dim)
         )
 
@@ -23,7 +27,7 @@ class VAE(nn.Module):
         self.input_dim = input_dim
         self.hidden_dim = hidden_dim
         self.latent_dim = latent_dim
-        self.res_depth = 10
+        self.res_depth = 12
         
         # Encoder layers
         self.encoder = nn.Sequential(
@@ -32,6 +36,8 @@ class VAE(nn.Module):
             *[ResNetBlock(hidden_dim) for _ in range(self.res_depth)],
             nn.Linear(hidden_dim, latent_dim * 2)  # Two sets of outputs for mean and variance
         )
+        # Modify encoder to resnet18
+        #self.encoder = resnet18(pretrained=False)
         
         # Decoder layers
         self.decoder = nn.Sequential(
