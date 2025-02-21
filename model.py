@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 from torchvision.models import resnet18
+from pytorch3d.loss import chamfer_distance
 
 class ResNetBlock(nn.Module):
     def __init__(self, dim):
@@ -73,6 +74,15 @@ def vae_loss(recon_x, x, mu, logvar):
     kl_divergence = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
 
     return recon_loss + kl_divergence
+
+# loss_l1
+def loss_l1(pred_distance, gt_distance, clamp=0.1):
+    l1_loss = nn.L1Loss()
+    pred_distance = torch.clamp(pred_distance, -clamp, clamp)
+    gt_distance = torch.clamp(gt_distance, -clamp, clamp)
+    loss = l1_loss(pred_distance, gt_distance)
+    return loss
+
 
 # Example usage
 input_dim = 3  # Dimension of input points
