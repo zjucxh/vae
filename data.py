@@ -62,9 +62,10 @@ class Cloth_in_Wind(Dataset):
         # Load obj file
         mesh = trimesh.load_mesh(self.datapath + '/cloth_seq%04d.obj' % (idx+1))
         #triangle_center = mesh.triangles_center
-        vertices = mesh.vertices
+        vertices = mesh.vertices - np.array([0,1,1])
         # faces = mesh.faces
-
+        #mean = np.mean(vertices, axis=0)
+        #print(f' mean : {mean}')
         # Append noise to vertices
         noised_vertices = self.add_noise(vertices)
         #vertices = torch.tensor(vertices, dtype=torch.float32)
