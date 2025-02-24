@@ -59,7 +59,7 @@ class Trainer:
 
 if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    input_dim = 1734  # Dimension of input points
+    input_dim = 867# Dimension of input points
     hidden_dim = 256  # Dimension of hidden layers
     latent_dim = 1024 # Dimension of the latent space
 
@@ -82,7 +82,7 @@ if __name__ == '__main__':
     test_loader = torch.utils.data.DataLoader(dataset, batch_size=8, shuffle=False)
 
     # Train the model
-    trainer.train(train_loader, val_loader, num_epochs=1000)
+    trainer.train(train_loader, val_loader, num_epochs=40000)
 
     # Test the model
     #trainer.test(test_loader)

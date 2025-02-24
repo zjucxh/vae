@@ -62,19 +62,19 @@ class Cloth_in_Wind(Dataset):
         # Load obj file
         mesh = trimesh.load_mesh(self.datapath + '/cloth_seq%04d.obj' % (idx+1))
         #triangle_center = mesh.triangles_center
-        vertices = mesh.vertices - np.array([0,1,1])
+        vertices = mesh.vertices 
         # faces = mesh.faces
         #mean = np.mean(vertices, axis=0)
         #print(f' mean : {mean}')
         # Append noise to vertices
-        noised_vertices = self.add_noise(vertices)
+        #noised_vertices = self.add_noise(vertices)
         #vertices = torch.tensor(vertices, dtype=torch.float32)
-        append_vertices = np.append(vertices, noised_vertices, axis=0)
+        #append_vertices = np.append(vertices, noised_vertices, axis=0)
         #append_vertices = torch.cat((torch.tensor(vertices, dtype=torch.float32), torch.tensor(noised_vertices, dtype=torch.float32)), dim=0)
         # Get signed distance field from mesh
-        sdist = self.signed_distance(mesh, append_vertices)
+        sdist = self.signed_distance(mesh, vertices)
 
-        return torch.tensor(append_vertices,dtype=torch.float32), torch.tensor(sdist,dtype=torch.float32)
+        return torch.tensor(vertices ,dtype=torch.float32), torch.tensor(sdist,dtype=torch.float32)
     
     def add_noise(self, vertices):
         noise = np.random.normal(0, 0.1, vertices.shape)
