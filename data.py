@@ -21,7 +21,7 @@ class Cloth_in_Wind(Dataset):
         # Compute the boundary edges 
         boundary_edges = self.boundary_edges(mesh)
         vertices = np.array(mesh.vertices,dtype=np.float32)
-        boundary_vertices = vertices[boundary_edges.flatten()]
+        boundary_vertices = vertices[np.unique(boundary_edges.flatten())]
         boundary_distance = np.zeros(points.shape[0],dtype=np.float32)
         mesh_distance = np.zeros(points.shape[0],dtype=np.float32)
         mesh_distance = np.abs(trimesh.proximity.signed_distance(mesh, points))
@@ -62,7 +62,7 @@ class Cloth_in_Wind(Dataset):
         # Load obj file
         mesh = trimesh.load_mesh(self.datapath + '/cloth_seq%04d.obj' % (idx+1))
         #triangle_center = mesh.triangles_center
-        vertices = mesh.vertices - np.array([0,1,1])
+        vertices = mesh.vertices 
         # faces = mesh.faces
         #mean = np.mean(vertices, axis=0)
         #print(f' mean : {mean}')
@@ -83,8 +83,10 @@ class Cloth_in_Wind(Dataset):
     
 if __name__=='__main__':
     dataset = Cloth_in_Wind()
-    dataloader = DataLoader(dataset, batch_size=7, shuffle=True)
+    dataloader = DataLoader(dataset, batch_size=8, shuffle=True)
     for i, data in enumerate(dataloader):
         vertices = data[0]
         sdist = data[1]
-        print(f'Batch {i}: vertices: {vertices.shape}, sdist: {sdist.shape}')
+        for d in sdist:
+            print(d)
+        #print(f'Batch {i}: vertices: {vertices.shape}, sdist: {sdist}')

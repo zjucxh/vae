@@ -25,10 +25,10 @@ class VAE(nn.Module):
     def __init__(self, input_dim, hidden_dim, latent_dim):
         super(VAE, self).__init__()
         
-        self.input_dim = input_dim
-        self.hidden_dim = hidden_dim
-        self.latent_dim = latent_dim
-        self.res_depth = 12
+        self.input_dim = input_dim # num of sampled points * 3
+        self.hidden_dim = hidden_dim # num of hidden units
+        self.latent_dim = latent_dim # num of latent variables
+        self.res_depth = 12 # num of resnet blocks
         
         # Encoder layers
         self.encoder = nn.Sequential(
@@ -45,7 +45,14 @@ class VAE(nn.Module):
             nn.Linear(latent_dim, hidden_dim),
             nn.ReLU(),
             *[ResNetBlock(hidden_dim) for _ in range(self.res_depth)],
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
             nn.Linear(hidden_dim, input_dim)
+        )
+        # final layer to output signed distance 
+        self.final_layer = nn.Sequential(
+            nn.Tanh(),
+            nn.Linear(input_dim, 1)
         )
     
     def reparameterize(self, mu, logvar):
@@ -60,20 +67,21 @@ class VAE(nn.Module):
         
         # Reparameterization trick
         z = self.reparameterize(mu, logvar)
+        print(f' z shape : {z.shape}')
         # Decode
-        recon_x = self.decoder(z)
+        sdist = self.decoder(z)
         
-        return recon_x, mu, logvar
+        return sdist , mu, logvar
 
 # Define the loss function for the VAE
 def vae_loss(recon_x, x, mu, logvar):
     # Reconstruction loss
-    recon_loss = F.mse_loss(recon_x, x, reduction='sum')
+    sdist_loss = loss_l1(recon_x, x)
 
     # KL divergence loss
     kl_divergence = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
 
-    return recon_loss + kl_divergence
+    return sdist_loss + kl_divergence
 
 # loss_l1
 def loss_l1(pred_distance, gt_distance, clamp=0.1):
@@ -108,11 +116,13 @@ if __name__=='__main__':
 
     x = torch.randn(batch_size,num_sampled_points, input_dim)
     x = torch.reshape(x, (batch_size, -1)).to(device='cuda')
+    #gt_dist = torch.randn(batch_size,num_sampled_points,1)
    
     # Initialize the VAE model
     vae_model = VAE(x.shape[-1], hidden_dim, latent_dim).to(device='cuda')
 
-    recon_x, mu, logvar = vae_model(x)
-    print(f' x: {x.shape}, recon_x: {recon_x.shape}, mu: {mu.shape}, logvar: {logvar.shape}')
-    loss = vae_loss(recon_x,x, mu, logvar)
-    print(f'loss: {loss}')
+    sdist , mu, logvar = vae_model(x)
+    print(' sdist shape : {}'.format(sdist.shape))
+    print(' mu shape : {}'.format(mu.shape))
+    print(' logvar shape : {}'.format(logvar.shape))
+    print('Done')

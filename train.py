@@ -82,7 +82,7 @@ if __name__ == '__main__':
     test_loader = torch.utils.data.DataLoader(dataset, batch_size=8, shuffle=False)
 
     # Train the model
-    trainer.train(train_loader, val_loader, num_epochs=1000)
+    trainer.train(train_loader, val_loader, num_epochs=40000)
 
     # Test the model
     #trainer.test(test_loader)
