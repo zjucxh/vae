@@ -16,9 +16,9 @@ class Trainer:
             self.model.train()
             running_loss = 0.0
             for i, data in enumerate(train_loader):
-                inputs, labels = data
-                inputs = inputs.reshape(inputs.shape[0],-1)
-                inputs, labels = inputs.to(self.device), labels.to(self.device)
+                vertices, sdist, noise, ndist = data
+                inputs = vertices.reshape(vertices.shape[0],-1)
+                inputs, sdist = inputs.to(self.device), sdist.to(self.device)
                 self.optimizer.zero_grad()
                 outputs, mu, logvar = self.model(inputs)
                 # reconstruction loss
@@ -59,7 +59,7 @@ class Trainer:
 
 if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    input_dim = 1734  # Dimension of input points
+    input_dim = 867 # Dimension of input points
     hidden_dim = 256  # Dimension of hidden layers
     latent_dim = 1024 # Dimension of the latent space
 

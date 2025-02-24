@@ -52,6 +52,20 @@ class Cloth_in_Wind(Dataset):
         edges, counts = np.unique(edges_sorted, axis=0, return_counts=True)
         non_shared_edges = edges[counts == 1]
         return non_shared_edges
+    
+    def boundary_vertices(self, mesh: trimesh.Trimesh):
+        """
+        Calculate vertices not shared by faces in a mesh. If the mesh is watertight, the result should be empty.
+        For non-watertight meshes, the result should be the boundary vertices.
+        Args:
+            mesh: trimesh.Trimesh object
+        Returns:
+            np.ndarray of shape (N, 3) with dtype=np.float32, representing the non-shared vertices
+        """
+        boundary_edges = self.boundary_edges(mesh)
+        vertices = np.array(mesh.vertices,dtype=np.float32)
+        boundary_vertices = vertices[np.unique(boundary_edges.flatten())]
+        return boundary_vertices
 
     
     def __len__(self):
@@ -63,18 +77,18 @@ class Cloth_in_Wind(Dataset):
         mesh = trimesh.load_mesh(self.datapath + '/cloth_seq%04d.obj' % (idx+1))
         #triangle_center = mesh.triangles_center
         vertices = mesh.vertices 
+        boundary_vertices = self.boundary_vertices(mesh)
         # faces = mesh.faces
         #mean = np.mean(vertices, axis=0)
         #print(f' mean : {mean}')
         # Append noise to vertices
-        noised_vertices = self.add_noise(vertices)
+        noise = self.add_noise(boundary_vertices)
         #vertices = torch.tensor(vertices, dtype=torch.float32)
-        append_vertices = np.append(vertices, noised_vertices, axis=0)
         #append_vertices = torch.cat((torch.tensor(vertices, dtype=torch.float32), torch.tensor(noised_vertices, dtype=torch.float32)), dim=0)
         # Get signed distance field from mesh
-        sdist = self.signed_distance(mesh, append_vertices)
-
-        return torch.tensor(append_vertices,dtype=torch.float32), torch.tensor(sdist,dtype=torch.float32)
+        sdist = self.signed_distance(mesh, vertices)
+        nsdist = self.signed_distance(mesh, noise)
+        return torch.tensor(vertices ,dtype=torch.float32), torch.tensor(sdist,dtype=torch.float32), torch.tensor(noise,dtype=torch.float32), torch.tensor(nsdist,dtype=torch.float32)
     
     def add_noise(self, vertices):
         noise = np.random.normal(0, 0.1, vertices.shape)
@@ -85,8 +99,9 @@ if __name__=='__main__':
     dataset = Cloth_in_Wind()
     dataloader = DataLoader(dataset, batch_size=8, shuffle=True)
     for i, data in enumerate(dataloader):
-        vertices = data[0]
-        sdist = data[1]
-        for d in sdist:
-            print(d)
-        #print(f'Batch {i}: vertices: {vertices.shape}, sdist: {sdist}')
+        vertices, sdist, noise, nsdist = data
+        print(f' vertices shape : {vertices.shape}')
+        print(f' sdist shape : {sdist.shape}')
+        print(f' noise shape : {noise.shape}')
+        print(f' nsdist shape : {nsdist.shape}')
+        break

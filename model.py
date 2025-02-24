@@ -4,6 +4,8 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 from torchvision.models import resnet18
 from pytorch3d.loss import chamfer_distance
+from data import Cloth_in_Wind
+from torch.utils.data import DataLoader, Dataset
 
 class ResNetBlock(nn.Module):
     def __init__(self, dim):
@@ -28,7 +30,7 @@ class VAE(nn.Module):
         self.input_dim = input_dim # num of sampled points * 3
         self.hidden_dim = hidden_dim # num of hidden units
         self.latent_dim = latent_dim # num of latent variables
-        self.res_depth = 12 # num of resnet blocks
+        self.res_depth = 5# num of resnet blocks
         
         # Encoder layers
         self.encoder = nn.Sequential(
@@ -49,11 +51,6 @@ class VAE(nn.Module):
             nn.ReLU(),
             nn.Linear(hidden_dim, input_dim)
         )
-        # final layer to output signed distance 
-        self.final_layer = nn.Sequential(
-            nn.Tanh(),
-            nn.Linear(input_dim, 1)
-        )
     
     def reparameterize(self, mu, logvar):
         std = torch.exp(0.5*logvar)
@@ -67,7 +64,6 @@ class VAE(nn.Module):
         
         # Reparameterization trick
         z = self.reparameterize(mu, logvar)
-        print(f' z shape : {z.shape}')
         # Decode
         sdist = self.decoder(z)
         
@@ -76,7 +72,8 @@ class VAE(nn.Module):
 # Define the loss function for the VAE
 def vae_loss(recon_x, x, mu, logvar):
     # Reconstruction loss
-    sdist_loss = loss_l1(recon_x, x)
+    #sdist_loss = loss_l1(recon_x, x)
+    sdist_loss = F.mse_loss(recon_x, x, reduction='sum')
 
     # KL divergence loss
     kl_divergence = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
@@ -92,34 +89,21 @@ def loss_l1(pred_distance, gt_distance, clamp=0.1):
     return loss
 
 
-# Example usage
-input_dim = 3  # Dimension of input points
-hidden_dim = 256  # Dimension of hidden layers
-latent_dim = 32  # Dimension of the latent space
-
-# Initialize the VAE model
-vae_model = VAE(input_dim, hidden_dim, latent_dim)
-
-# Define optimizer
-optimizer = torch.optim.Adam(vae_model.parameters(), lr=0.001)
-
-
 if __name__=='__main__':
-    # Example usage
-    input_dim = 3  # Dimension of input points
-    hidden_dim = 256  # Dimension of hidden layers
-    latent_dim = 1024 # Dimension of the latent space
-    
-    # Forward vae model
-    batch_size = 8
-    num_sampled_points = 289
-
-    x = torch.randn(batch_size,num_sampled_points, input_dim)
-    x = torch.reshape(x, (batch_size, -1)).to(device='cuda')
-    #gt_dist = torch.randn(batch_size,num_sampled_points,1)
-   
+    # load data
+    dataset = Cloth_in_Wind()
+    dataloader = DataLoader(dataset, batch_size=4, shuffle=True)
+    input_dim = 289 * 3
+    hidden_dim = 256
+    latent_dim = 1024 
+    vae_model = VAE(input_dim, hidden_dim, latent_dim).to(device='cuda')
     # Initialize the VAE model
-    vae_model = VAE(x.shape[-1], hidden_dim, latent_dim).to(device='cuda')
+    for i, data in enumerate(dataloader):
+        x, sdist, noise, nsdist = data
+        x = x.view(x.size(0), -1).to('cuda')
+        y, mu, var = vae_model(x)
+        print('y shape : {}'.format(y.shape))
+    
 
     sdist , mu, logvar = vae_model(x)
     print(' sdist shape : {}'.format(sdist.shape))
