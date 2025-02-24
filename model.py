@@ -16,7 +16,7 @@ class ResNetBlock(nn.Module):
             #nn.utils.parametrizations.weight_norm(nn.Linear(dim, dim)),
             nn.LeakyReLU(),
             #nn.Dropout(0.5)
-            #nn.Linear(dim, dim)
+            nn.Linear(dim, dim)
         )
 
     def forward(self, x):
@@ -30,7 +30,7 @@ class VAE(nn.Module):
         self.input_dim = input_dim # num of sampled points * 3
         self.hidden_dim = hidden_dim # num of hidden units
         self.latent_dim = latent_dim # num of latent variables
-        self.res_depth = 5# num of resnet blocks
+        self.res_depth = 18 # num of resnet blocks
         
         # Encoder layers
         self.encoder = nn.Sequential(
