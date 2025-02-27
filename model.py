@@ -4,6 +4,8 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 from torchvision.models import resnet18
 from pytorch3d.loss import chamfer_distance
+from data import Cloth_in_Wind
+from torch.utils.data import DataLoader, Dataset
 
 class ResNetBlock(nn.Module):
     def __init__(self, dim):
@@ -14,7 +16,7 @@ class ResNetBlock(nn.Module):
             #nn.utils.parametrizations.weight_norm(nn.Linear(dim, dim)),
             nn.LeakyReLU(),
             #nn.Dropout(0.5)
-            #nn.Linear(dim, dim)
+            nn.Linear(dim, dim)
         )
 
     def forward(self, x):
@@ -25,10 +27,10 @@ class VAE(nn.Module):
     def __init__(self, input_dim, hidden_dim, latent_dim):
         super(VAE, self).__init__()
         
-        self.input_dim = input_dim
-        self.hidden_dim = hidden_dim
-        self.latent_dim = latent_dim
-        self.res_depth = 12
+        self.input_dim = input_dim # num of sampled points * 3
+        self.hidden_dim = hidden_dim # num of hidden units
+        self.latent_dim = latent_dim # num of latent variables
+        self.res_depth = 50# num of resnet blocks
         
         # Encoder layers
         self.encoder = nn.Sequential(
@@ -45,6 +47,8 @@ class VAE(nn.Module):
             nn.Linear(latent_dim, hidden_dim),
             nn.ReLU(),
             *[ResNetBlock(hidden_dim) for _ in range(self.res_depth)],
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
             nn.Linear(hidden_dim, input_dim)
         )
     
@@ -61,19 +65,20 @@ class VAE(nn.Module):
         # Reparameterization trick
         z = self.reparameterize(mu, logvar)
         # Decode
-        recon_x = self.decoder(z)
+        sdist = self.decoder(z)
         
-        return recon_x, mu, logvar
+        return sdist , mu, logvar
 
 # Define the loss function for the VAE
 def vae_loss(recon_x, x, mu, logvar):
     # Reconstruction loss
-    recon_loss = F.mse_loss(recon_x, x, reduction='sum')
+    #sdist_loss = loss_l1(recon_x, x)
+    sdist_loss = F.mse_loss(recon_x, x, reduction='sum')
 
     # KL divergence loss
     kl_divergence = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
 
-    return recon_loss + kl_divergence
+    return sdist_loss + kl_divergence
 
 # loss_l1
 def loss_l1(pred_distance, gt_distance, clamp=0.1):
@@ -84,35 +89,24 @@ def loss_l1(pred_distance, gt_distance, clamp=0.1):
     return loss
 
 
-# Example usage
-input_dim = 3  # Dimension of input points
-hidden_dim = 256  # Dimension of hidden layers
-latent_dim = 32  # Dimension of the latent space
-
-# Initialize the VAE model
-vae_model = VAE(input_dim, hidden_dim, latent_dim)
-
-# Define optimizer
-optimizer = torch.optim.Adam(vae_model.parameters(), lr=0.001)
-
-
 if __name__=='__main__':
-    # Example usage
-    input_dim = 3  # Dimension of input points
-    hidden_dim = 256  # Dimension of hidden layers
-    latent_dim = 1024 # Dimension of the latent space
-    
-    # Forward vae model
-    batch_size = 8
-    num_sampled_points = 289
-
-    x = torch.randn(batch_size,num_sampled_points, input_dim)
-    x = torch.reshape(x, (batch_size, -1)).to(device='cuda')
-   
+    # load data
+    dataset = Cloth_in_Wind()
+    dataloader = DataLoader(dataset, batch_size=4, shuffle=True)
+    input_dim = 289 * 3
+    hidden_dim = 256
+    latent_dim = 1024 
+    vae_model = VAE(input_dim, hidden_dim, latent_dim).to(device='cuda')
     # Initialize the VAE model
-    vae_model = VAE(x.shape[-1], hidden_dim, latent_dim).to(device='cuda')
+    for i, data in enumerate(dataloader):
+        x, sdist, noise, nsdist = data
+        x = x.view(x.size(0), -1).to('cuda')
+        y, mu, var = vae_model(x)
+        print('y shape : {}'.format(y.shape))
+    
 
-    recon_x, mu, logvar = vae_model(x)
-    print(f' x: {x.shape}, recon_x: {recon_x.shape}, mu: {mu.shape}, logvar: {logvar.shape}')
-    loss = vae_loss(recon_x,x, mu, logvar)
-    print(f'loss: {loss}')
+    sdist , mu, logvar = vae_model(x)
+    print(' sdist shape : {}'.format(sdist.shape))
+    print(' mu shape : {}'.format(mu.shape))
+    print(' logvar shape : {}'.format(logvar.shape))
+    print('Done')
