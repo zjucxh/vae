@@ -112,8 +112,9 @@ if __name__=='__main__':
     dataset = Cloth_in_Wind()
     input_dim = 289 * 3
     batch_size = 8
-    seq_length = 4
-    dataloader = DataLoader(dataset, batch_size=seq_length+1, shuffle=False)
+    seq_length = 3
+    dataloader = DataLoader(dataset, batch_size=batch_size*(seq_length+1), shuffle=False)
+    num_epoches = 5000
     
 
     # Load GRU model
@@ -121,21 +122,22 @@ if __name__=='__main__':
     print(f' gru model : {gru}')
     optimizer = torch.optim.Adam(gru.parameters(), lr=1.0e-5)
     critrion = nn.MSELoss()
-    data = torch.empty(batch_size, seq_length, input_dim).to('cuda')
-    for epoch in range(1000):
-
-        for batch in range(batch_size):
-            for i, vertices in enumerate(dataloader):
-                vertices = vertices.reshape(vertices.shape[0], -1)
-                data[batch] = vertices[:seq_length].to('cuda')
-                gt = vertices[seq_length].to('cuda')
-                outputs = gru(data)
-                # l2 loss
-                loss = critrion(outputs, gt)
-                print(f' loss : {loss.item()}')
-
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
-            
+    # Train the model
+    for epoch in range(num_epoches):
+        running_loss = 0.0
+        for i, data in enumerate(dataloader):
+            # reshape data to batch_size, seq_length, input_dim
+            #print(f' data shape : {data.shape}')
+            data = data.reshape(-1, seq_length+1, input_dim).to('cuda')
+            x = data[:,:seq_length,:]
+            y = data[:,-1,:]
+            #print(f' y shape  :{y.shape}')
+            optimizer.zero_grad()
+            output = gru(x)
+            #print(f' output shape : {output.shape}')
+            loss = critrion(output, y)
+            running_loss += loss.item()
+            loss.backward()
+            optimizer.step()
+        print(f'[{epoch + 1}], loss: {running_loss / 10}')
     print('Done')
