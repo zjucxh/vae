@@ -77,7 +77,7 @@ if __name__ == '__main__':
 
     # Load the dataset
     dataset = Cloth_in_Wind()
-    train_loader = torch.utils.data.DataLoader(dataset, batch_size=64, shuffle=True, num_workers=6)
+    train_loader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=True)
     val_loader = torch.utils.data.DataLoader(dataset, batch_size=8, shuffle=True)
     test_loader = torch.utils.data.DataLoader(dataset, batch_size=8, shuffle=False)
 

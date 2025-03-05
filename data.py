@@ -1,3 +1,4 @@
+import os
 import numpy as np
 # load dataset with torch
 import torch
@@ -7,6 +8,14 @@ import trimesh
 class Cloth_in_Wind(Dataset):
     def __init__(self, datapath:str='/home/cxh/mnt/cxh/Documents/dataset/cloth_in_wind'):
         self.datapath = datapath
+        self.data_length = 600
+        self.wind_velocity = np.ones(3,dtype=np.float32)
+        # Load obj file via trimesh and store to list
+        print(f' loading data sequences')
+        self.mesh = [trimesh.load_mesh(os.path.join(self.datapath, 'cloth_seq%04d.obj' % (i+1))) for i in range(self.data_length)]
+        initial_mesh = self.mesh[0]
+        print('Done')
+
 
     def signed_distance(self, mesh:trimesh.Trimesh, points:np.ndarray,eps:float=1e-5):
         """
@@ -70,11 +79,10 @@ class Cloth_in_Wind(Dataset):
     
     def __len__(self):
 
-        return 600 # Number of obj files in the dataset
+        return self.data_length # Number of obj files in the dataset
 
     def __getitem__(self, idx):
-        # Load obj file
-        mesh = trimesh.load_mesh(self.datapath + '/cloth_seq%04d.obj' % (idx+1))
+        mesh = self.mesh[idx]
         #triangle_center = mesh.triangles_center
         vertices = mesh.vertices 
         #boundary_vertices = self.boundary_vertices(mesh)
@@ -97,8 +105,9 @@ class Cloth_in_Wind(Dataset):
     
 if __name__=='__main__':
     dataset = Cloth_in_Wind()
-    dataloader = DataLoader(dataset, batch_size=8, shuffle=True)
-    for i, data in enumerate(dataloader):
-        vertices = data
-        print(f' vertices shape : {vertices.shape}')
-        break
+    mesh0 = dataset.mesh[0]
+    mesh1 = dataset.mesh[2]
+    vertices0 = mesh0.vertices
+    vertices1 = mesh1.vertices
+    vertices_diff = vertices1 - vertices0
+    print(f' vertices_diff {np.mean(vertices_diff,axis=0)}')
