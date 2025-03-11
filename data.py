@@ -102,12 +102,45 @@ class Cloth_in_Wind(Dataset):
         noise = np.random.normal(0, 0.1, vertices.shape)
         return vertices + noise
     
+class CMU_simulation(Dataset):
+    def __init__(self, datapath:str='/home/cxh/mnt/cxh/Documents/dataset/CMU_mini_dataset'):
+        super().__init__()
+        self.datapath = datapath
+        self.sequence_length = 130 # Number of obj in each sequence
+        self.initial_mesh  = trimesh.load_mesh('assets/template.obj')
+        self.template_faces = np.array(self.initial_mesh.faces, dtype=np.int64)
+        self.template_vertices = np.array(self.initial_mesh.vertices, dtype=np.float32)
+        # walk through all the sequences
+        self.npz_files = []
+        self.npz_indices = []
+        for root, dirs, files in os.walk(self.datapath):
+            for file in files:
+                if file.endswith('.npz'):
+                    self.npz_files.append(os.path.join(root, file))
+                    self.npz_indices.append(int(file.split('.')[0].split('_')[0]))
+        #print(f' npz_files: {self.npz_files}')
+        #print(f' npz_indices: {self.npz_indices}') 
+        self.dataset_length = len(self.npz_files)
+        #print(f' dataset_length: {self.dataset_length}')
+    def __len__(self):
+        return self.dataset_length
     
+    def __getitem__(self, index):
+        # Load the sequence
+        npz_file = self.npz_files[index]
+        data = np.load(npz_file)
+        gender = data['gender']
+        beta = data['betas']
+        poses = data['poses']
+        vertex_seq = data['vertex_seq']
+        # print
+        #print('gender : {0}'.format(gender))
+        #print('beta : {0}'.format(beta.shape))
+        #print('poses : {0}'.format(poses.shape))
+        #print('vertex_seq : {0}'.format(vertex_seq.shape))
+        # return the sequence
+        return data
+
 if __name__=='__main__':
-    dataset = Cloth_in_Wind()
-    mesh0 = dataset.mesh[0]
-    mesh1 = dataset.mesh[2]
-    vertices0 = mesh0.vertices
-    vertices1 = mesh1.vertices
-    vertices_diff = vertices1 - vertices0
-    print(f' vertices_diff {np.mean(vertices_diff,axis=0)}')
+    cmu_simulation_dataset = CMU_simulation()
+    cmu_simulation_dataset[0]
