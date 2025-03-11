@@ -137,7 +137,7 @@ class CMU_simulation(Dataset):
             gender = 1 # male
         betas = data['betas']
         poses = data['poses']
-        vertex_seq = data['vertex_seq'] #- self.template_vertices
+        vertex_seq = data['vertex_seq'] - self.template_vertices
         #print(f' .............................')
         #print(f' vertex seq : {vertex_seq}')
         #vertex_seq = vertex_seq / 40.0
