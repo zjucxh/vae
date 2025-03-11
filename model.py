@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 from torchvision.models import resnet18
 from pytorch3d.loss import chamfer_distance
-from data import Cloth_in_Wind
+from data import Cloth_in_Wind, CMU_simulation 
 from torch.utils.data import DataLoader, Dataset
 
 class ResNetBlock(nn.Module):
@@ -84,7 +84,8 @@ class GRU(nn.Module):
         h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_dim).to('cuda')
         #print(f' h0 shape : {h0.shape}')
         out, _ = self.gru(x, h0)
-        out = self.fc(out[:,-1,:])
+        #out = self.fc(out[:,-1,:])
+        out = self.fc(out)
         return out
 
 # Define the loss function for the VAE
@@ -109,16 +110,20 @@ def loss_l1(pred_distance, gt_distance, clamp=0.1):
 
 if __name__=='__main__':
     # load data
-    dataset = Cloth_in_Wind()
-    input_dim = 289 * 3
-    batch_size = 8
-    seq_length = 3
-    dataloader = DataLoader(dataset, batch_size=batch_size*(seq_length+1), shuffle=False)
+    dataset = CMU_simulation()
+    template_vertices = torch.tensor(dataset.template_vertices, dtype=torch.float32,device='cuda')
+    template_faces = dataset.template_faces
+
+    input_dim = 181
+    output_dim = 2590*3
+    batch_size = 8 
+    seq_length = 130
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
     num_epoches = 5000
     
 
     # Load GRU model
-    gru = GRU(input_dim=input_dim, hidden_dim=256, num_layers=4, output_dim=input_dim).to('cuda')
+    gru = GRU(input_dim=input_dim, hidden_dim=512, num_layers=8, output_dim=output_dim).to('cuda')
     print(f' gru model : {gru}')
     optimizer = torch.optim.Adam(gru.parameters(), lr=1.0e-5)
     critrion = nn.MSELoss()
@@ -127,17 +132,20 @@ if __name__=='__main__':
         running_loss = 0.0
         for i, data in enumerate(dataloader):
             # reshape data to batch_size, seq_length, input_dim
-            #print(f' data shape : {data.shape}')
-            data = data.reshape(-1, seq_length+1, input_dim).to('cuda')
-            x = data[:,:seq_length,:]
-            y = data[:,-1,:]
-            #print(f' y shape  :{y.shape}')
+            gender, poses, vertex_seq = data
+            vertex_seq = vertex_seq.view(-1, seq_length, 7770).to(device='cuda')
+            poses = poses.to(device='cuda')
+            # reshape beta from batch_size, 16 to batch_size, sequence_length, 16
             optimizer.zero_grad()
-            output = gru(x)
-            #print(f' output shape : {output.shape}')
-            loss = critrion(output, y)
+            output = gru(poses)
+            #print(f' out shape : {output.shape}')
+            loss = critrion(output, vertex_seq)
             running_loss += loss.item()
+
+            if i % 10 == 9:
+                print(f'[{epoch + 1}, {i + 1}] loss: {running_loss / 10}')
+                running_loss = 0.0
+            
             loss.backward()
             optimizer.step()
-        print(f'[{epoch + 1}], loss: {running_loss / 10}')
     print('Done')

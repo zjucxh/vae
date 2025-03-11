@@ -107,9 +107,10 @@ class CMU_simulation(Dataset):
         super().__init__()
         self.datapath = datapath
         self.sequence_length = 130 # Number of obj in each sequence
-        self.initial_mesh  = trimesh.load_mesh('assets/template.obj')
+        self.initial_mesh  = trimesh.load_mesh('assets/template_align.obj')
         self.template_faces = np.array(self.initial_mesh.faces, dtype=np.int64)
         self.template_vertices = np.array(self.initial_mesh.vertices, dtype=np.float32)
+        #print(f' template_vertices : {self.template_vertices.shape}')
         # walk through all the sequences
         self.npz_files = []
         self.npz_indices = []
@@ -129,18 +130,38 @@ class CMU_simulation(Dataset):
         # Load the sequence
         npz_file = self.npz_files[index]
         data = np.load(npz_file)
-        gender = data['gender']
-        beta = data['betas']
+        gender = 0
+        if data['gender'] == 'female':
+            gender = 0 # female
+        else:
+            gender = 1 # male
+        betas = data['betas']
         poses = data['poses']
-        vertex_seq = data['vertex_seq']
+        vertex_seq = data['vertex_seq'] #- self.template_vertices
+        #print(f' .............................')
+        #print(f' vertex seq : {vertex_seq}')
+        #vertex_seq = vertex_seq / 40.0
+        #print(f' vertex_seq : {vertex_seq.shape}')
+        # reshape beta from (,16) to (sequence_length, 16)
+        betas = np.repeat(betas[np.newaxis, :], self.sequence_length, axis=0) 
+        # concat betas with poses
+        poses = np.concatenate((betas, poses), axis=1)
         # print
         #print('gender : {0}'.format(gender))
         #print('beta : {0}'.format(beta.shape))
         #print('poses : {0}'.format(poses.shape))
         #print('vertex_seq : {0}'.format(vertex_seq.shape))
         # return the sequence
-        return data
+        return gender, torch.tensor(poses,dtype=torch.float32), torch.tensor(vertex_seq, dtype=torch.float32)
 
 if __name__=='__main__':
     cmu_simulation_dataset = CMU_simulation()
-    cmu_simulation_dataset[0]
+    template_vertices = cmu_simulation_dataset.template_vertices
+    template_faces = cmu_simulation_dataset.template_faces
+    # Dataloader
+    dataloader = DataLoader(cmu_simulation_dataset, batch_size=4, shuffle=True)
+    for i, data in enumerate(dataloader):
+        gender, poses, vertex_seq = data
+        print('poses : {0}'.format(poses.shape))
+        print('vertex_seq : {0}'.format(vertex_seq.shape))
+        break
