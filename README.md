@@ -10,3 +10,4 @@ Variatonal AutoEncoder
 - Load cmu simulation dataset
 - Feed to GRU
 - Train with MSE loss to see the preliminary results
+- Think about where the template obj file should be loaded
