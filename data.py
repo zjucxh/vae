@@ -4,6 +4,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader, Dataset
 import trimesh
+import pytorch3d as p3d
 
 class Cloth_in_Wind(Dataset):
     def __init__(self, datapath:str='/home/cxh/mnt/cxh/Documents/dataset/cloth_in_wind'):
@@ -102,12 +103,99 @@ class Cloth_in_Wind(Dataset):
         noise = np.random.normal(0, 0.1, vertices.shape)
         return vertices + noise
     
+class CMU_simulation(Dataset):
+    def __init__(self, datapath:str='/home/cxh/mnt/cxh/Documents/dataset/CMU_mini_dataset'):
+        super().__init__()
+        self.datapath = datapath
+        self.sequence_length = 130 # Number of obj in each sequence
+        self.initial_mesh  = trimesh.load_mesh('assets/template_align.obj')
+        self.template_faces = np.array(self.initial_mesh.faces, dtype=np.int64)
+        self.template_vertices = np.array(self.initial_mesh.vertices, dtype=np.float32)
+        #print(f' template_vertices : {self.template_vertices.shape}')
+        # walk through all the sequences
+        self.npz_files = []
+        self.npz_indices = []
+        for root, dirs, files in os.walk(self.datapath):
+            for file in files:
+                if file.endswith('.npz'):
+                    self.npz_files.append(os.path.join(root, file))
+                    self.npz_indices.append(int(file.split('.')[0].split('_')[0]))
+        #print(f' npz_files: {self.npz_files}')
+        #print(f' npz_indices: {self.npz_indices}') 
+        self.dataset_length = len(self.npz_files)
+        self.data = []
+        self.normals = []
+        self.gender = 0
+        # load all data sequences
+        for i in range(self.dataset_length):
+            seq = np.load(self.npz_files[i])
+            self.data.append(seq)
+        #print(f' dataset_length: {self.dataset_length}')
+        
+        # TODO compute vertex normals given vertex_seq and template faces
+        for i, mesh_seq in enumerate(self.data):
+            vertex_seq = mesh_seq['vertex_seq']
+            vertex_normals = self.compute_vertex_normals(vertex_seq, self.template_faces)
+            self.normals.append(vertex_normals)
+        print(f' vertex_normals : {self.normals}')
+
+
+    def __len__(self):
+        return self.dataset_length
     
+    def __getitem__(self, index):
+        # Load the sequence
+        #npz_file = self.npz_files[index]
+        #data = np.load(npz_file)
+        gender = 0
+        #if data['gender'] == 'female':
+        #    gender = 0 # female
+        #else:
+        #    gender = 1 # male
+        data = self.data[index]
+        betas = data['betas']
+        poses = data['poses']
+        vertex_seq = data['vertex_seq']
+        vertex_seq = vertex_seq - self.template_vertices
+        #print(f' .............................')
+        #print(f' vertex seq : {vertex_seq}')
+        #vertex_seq = vertex_seq / 40.0
+        #print(f' vertex_seq : {vertex_seq.shape}')
+        # reshape beta from (,16) to (sequence_length, 16)
+        betas = np.repeat(betas[np.newaxis, :], self.sequence_length, axis=0) 
+        # concat betas with poses
+        poses = np.concatenate((betas, poses), axis=1)
+        # print
+        #print('gender : {0}'.format(gender))
+        #print('beta : {0}'.format(beta.shape))
+        #print('poses : {0}'.format(poses.shape))
+        #print('vertex_seq : {0}'.format(vertex_seq.shape))
+        # return the sequence
+        return gender, torch.tensor(poses,dtype=torch.float32), torch.tensor(vertex_seq, dtype=torch.float32)
+    
+    def compute_vertex_normals(self, vertex_seq, faces):
+        """
+        Compute the vertex normals from the vertex sequence and faces
+        Args:
+            vertex_seq: np.ndarray of shape (sequence_length, num_vertices, 3)
+            faces: np.ndarray of shape (num_faces, 3)
+        Returns:
+            np.ndarray of shape (sequence_length, num_vertices, 3) with dtype=np.float32
+        """
+        # Compute the normals for each face
+        #meshes = p3d.structures.Meshes(vertex_seq[0], faces)
+        # Compute the normals for each vertex
+        
+        return None
+
 if __name__=='__main__':
-    dataset = Cloth_in_Wind()
-    mesh0 = dataset.mesh[0]
-    mesh1 = dataset.mesh[2]
-    vertices0 = mesh0.vertices
-    vertices1 = mesh1.vertices
-    vertices_diff = vertices1 - vertices0
-    print(f' vertices_diff {np.mean(vertices_diff,axis=0)}')
+    cmu_simulation_dataset = CMU_simulation()
+    template_vertices = cmu_simulation_dataset.template_vertices
+    template_faces = cmu_simulation_dataset.template_faces
+    # Dataloader
+    dataloader = DataLoader(cmu_simulation_dataset, batch_size=4, shuffle=True)
+    for i, data in enumerate(dataloader):
+        gender, poses, vertex_seq = data
+        print('poses : {0}'.format(poses.shape))
+        print('vertex_seq : {0}'.format(vertex_seq.shape))
+        break
