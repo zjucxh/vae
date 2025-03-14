@@ -110,7 +110,7 @@ def loss_l1(pred_distance, gt_distance, clamp=0.1):
 
 if __name__=='__main__':
     # load data
-    dataset = CMU_simulation()
+    dataset = CMU_simulation('/home/cxh/tmp/CMU_mini_dataset')
     template_vertices = torch.tensor(dataset.template_vertices, dtype=torch.float32,device='cuda')
     template_faces = dataset.template_faces
 
@@ -119,7 +119,7 @@ if __name__=='__main__':
     batch_size = 8 
     seq_length = 130
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-    num_epoches = 5000
+    num_epoches = 15000
     
 
     # Load GRU model
@@ -148,4 +148,9 @@ if __name__=='__main__':
             
             loss.backward()
             optimizer.step()
+
+        # save model for every 100 epoches
+        if epoch % 100 == 99:
+            torch.save(gru.state_dict(), '/home/cxh/tmp/checkpoint/gru_{0:0>3}.pth'.format((epoch-99)//100))
+        
     print('Done')

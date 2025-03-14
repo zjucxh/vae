@@ -4,6 +4,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader, Dataset
 import trimesh
+import pytorch3d as p3d
 
 class Cloth_in_Wind(Dataset):
     def __init__(self, datapath:str='/home/cxh/mnt/cxh/Documents/dataset/cloth_in_wind'):
@@ -122,22 +123,40 @@ class CMU_simulation(Dataset):
         #print(f' npz_files: {self.npz_files}')
         #print(f' npz_indices: {self.npz_indices}') 
         self.dataset_length = len(self.npz_files)
+        self.data = []
+        self.normals = []
+        self.gender = 0
+        # load all data sequences
+        for i in range(self.dataset_length):
+            seq = np.load(self.npz_files[i])
+            self.data.append(seq)
         #print(f' dataset_length: {self.dataset_length}')
+        
+        # TODO compute vertex normals given vertex_seq and template faces
+        for i, mesh_seq in enumerate(self.data):
+            vertex_seq = mesh_seq['vertex_seq']
+            vertex_normals = self.compute_vertex_normals(vertex_seq, self.template_faces)
+            self.normals.append(vertex_normals)
+        print(f' vertex_normals : {self.normals}')
+
+
     def __len__(self):
         return self.dataset_length
     
     def __getitem__(self, index):
         # Load the sequence
-        npz_file = self.npz_files[index]
-        data = np.load(npz_file)
+        #npz_file = self.npz_files[index]
+        #data = np.load(npz_file)
         gender = 0
-        if data['gender'] == 'female':
-            gender = 0 # female
-        else:
-            gender = 1 # male
+        #if data['gender'] == 'female':
+        #    gender = 0 # female
+        #else:
+        #    gender = 1 # male
+        data = self.data[index]
         betas = data['betas']
         poses = data['poses']
-        vertex_seq = data['vertex_seq'] - self.template_vertices
+        vertex_seq = data['vertex_seq']
+        vertex_seq = vertex_seq - self.template_vertices
         #print(f' .............................')
         #print(f' vertex seq : {vertex_seq}')
         #vertex_seq = vertex_seq / 40.0
@@ -153,6 +172,21 @@ class CMU_simulation(Dataset):
         #print('vertex_seq : {0}'.format(vertex_seq.shape))
         # return the sequence
         return gender, torch.tensor(poses,dtype=torch.float32), torch.tensor(vertex_seq, dtype=torch.float32)
+    
+    def compute_vertex_normals(self, vertex_seq, faces):
+        """
+        Compute the vertex normals from the vertex sequence and faces
+        Args:
+            vertex_seq: np.ndarray of shape (sequence_length, num_vertices, 3)
+            faces: np.ndarray of shape (num_faces, 3)
+        Returns:
+            np.ndarray of shape (sequence_length, num_vertices, 3) with dtype=np.float32
+        """
+        # Compute the normals for each face
+        #meshes = p3d.structures.Meshes(vertex_seq[0], faces)
+        # Compute the normals for each vertex
+        
+        return None
 
 if __name__=='__main__':
     cmu_simulation_dataset = CMU_simulation()
