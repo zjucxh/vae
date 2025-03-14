@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 from torchvision.models import resnet18
 from pytorch3d.loss import chamfer_distance
-from data import Cloth_in_Wind, CMU_simulation 
+from data import CMU_simulation 
 from torch.utils.data import DataLoader, Dataset
 
 class ResNetBlock(nn.Module):
@@ -111,7 +111,7 @@ def loss_l1(pred_distance, gt_distance, clamp=0.1):
 if __name__=='__main__':
     # load data
     dataset = CMU_simulation('/home/cxh/tmp/CMU_mini_dataset')
-    template_vertices = torch.tensor(dataset.template_vertices, dtype=torch.float32,device='cuda')
+    template_vertices = dataset.template_vertices.to(device='cuda')
     template_faces = dataset.template_faces
 
     input_dim = 181
@@ -138,7 +138,7 @@ if __name__=='__main__':
             # reshape beta from batch_size, 16 to batch_size, sequence_length, 16
             optimizer.zero_grad()
             output = gru(poses)
-            #print(f' out shape : {output.shape}')
+            print(f' out shape : {output.shape}')
             loss = critrion(output, vertex_seq)
             running_loss += loss.item()
 
