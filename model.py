@@ -150,7 +150,7 @@ if __name__=='__main__':
             optimizer.step()
 
         # save model for every 100 epoches
-        if epoch % 100 == 99:
-            torch.save(gru.state_dict(), '/home/cxh/tmp/checkpoint/gru_{0:0>3}.pth'.format((epoch-99)//100))
+        #if epoch % 100 == 99:
+        #   torch.save(gru.state_dict(), '/home/cxh/tmp/checkpoint/gru_{0:0>3}.pth'.format((epoch-99)//100))
         
     print('Done')
