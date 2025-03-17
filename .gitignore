@@ -173,3 +173,5 @@ cython_debug/
 assets/
 
 runs/vae/
+
+runs/gru/
