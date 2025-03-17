@@ -48,32 +48,20 @@ class CMU_simulation(Dataset):
         return self.dataset_length
     
     def __getitem__(self, index):
-        # Load the sequence
-        #npz_file = self.npz_files[index]
-        #data = np.load(npz_file)
+        
         gender = 0
-        #if data['gender'] == 'female':
-        #    gender = 0 # female
-        #else:
-        #    gender = 1 # male
         data = self.data[index]
+        if data['gender'] == 'female':
+            gender = 0 # female
+        else:
+            gender = 1 # male
         betas = data['betas']
         poses = data['poses']
         vertex_seq = torch.tensor(data['vertex_seq'],dtype=torch.float32)
         vertex_seq = vertex_seq - self.template_vertices
-        #print(f' .............................')
-        #print(f' vertex seq : {vertex_seq}')
-        #vertex_seq = vertex_seq / 40.0
-        #print(f' vertex_seq : {vertex_seq.shape}')
-        # reshape beta from (,16) to (sequence_length, 16)
         betas = np.repeat(betas[np.newaxis, :], self.sequence_length, axis=0) 
         # concat betas with poses
         poses = np.concatenate((betas, poses), axis=1)
-        # print
-        #print('gender : {0}'.format(gender))
-        #print('beta : {0}'.format(beta.shape))
-        #print('poses : {0}'.format(poses.shape))
-        #print('vertex_seq : {0}'.format(vertex_seq.shape))
         # return the sequence
         poses = torch.tensor(poses, dtype=torch.float32)
         return gender, poses, vertex_seq
