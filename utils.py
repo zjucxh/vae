@@ -34,8 +34,17 @@ def mesh_normals(vertices, faces):
 
     return vertex_normals
 
+# define normalized laplacian matrix
+def laplacian_matrix(faces, normalize=True):
+    """
+    Compute the normalized Laplacian matrix of a mesh.
+    Args:
+        faces: np.ndarray of shape (N, 3) with dtype=np.int32
+        normalize: bool, whether to normalize the Laplacian matrix
+    Returns:
+        torch.Tensor of shape (num_vertices, num_vertices) with dtype=torch.float32
+    """
 
-def laplacian_matrix(faces):
     num_faces = faces.shape[0]
     num_vertices = faces.max() + 1
     # adjacency matrix
@@ -50,7 +59,12 @@ def laplacian_matrix(faces):
         adj_matrix[v2,v1] = 1.0
     # degree matrix
     degrees = adj_matrix.sum(dim=1)
-    laplacian_mat = torch.diag(degrees) - adj_matrix
+    if normalize:
+        degrees = torch.sqrt(1.0 / (degrees + 1e-5))
+        degree_matrix = torch.diag(degrees)
+        laplacian_mat = torch.eye(num_vertices) - degree_matrix @ adj_matrix @ degree_matrix
+    else:
+        laplacian_mat = torch.diag(degrees) - adj_matrix
     return laplacian_mat
 
 def boundary_edges(mesh: trimesh.Trimesh):
