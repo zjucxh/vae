@@ -107,6 +107,9 @@ def loss_l1(pred_distance, gt_distance, clamp=0.1):
     loss = l1_loss(pred_distance, gt_distance)
     return loss
 
+# batched laplacian loss
+#def loss_laplacian(laplacian_matrix, )
+
 
 if __name__=='__main__':
     # load data
@@ -139,6 +142,7 @@ if __name__=='__main__':
             optimizer.zero_grad()
             output = gru(poses)
             print(f' out shape : {output.shape}')
+            print(f' ground truth shape : {vertex_seq.shape}')
             loss = critrion(output, vertex_seq)
             running_loss += loss.item()
 
@@ -148,6 +152,7 @@ if __name__=='__main__':
             
             loss.backward()
             optimizer.step()
+            break
 
         # save model for every 100 epoches
         #if epoch % 100 == 99:

@@ -27,9 +27,9 @@ class CMU_simulation(Dataset):
                     self.npz_indices.append(int(file.split('.')[0].split('_')[0]))
         #print(f' npz_files: {self.npz_files}')
         #print(f' npz_indices: {self.npz_indices}') 
-        self.laplacian_matrix = laplacian_matrix(self.template_faces)
-        #print(f' laplacian matirx : {(self.laplacian_matrix)}')
-        
+        self.laplacian_matrix = laplacian_matrix(self.template_faces,normalize=True)
+        print(f' laplacian matirx shape: {(self.laplacian_matrix.shape)}')
+        print(f' sum of laplacian matirx: {(self.laplacian_matrix)}')
         self.dataset_length = len(self.npz_files)
         self.data = []
         self.normals = []
