@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 from torchvision.models import resnet18
 from pytorch3d.loss import chamfer_distance
-from data import Cloth_in_Wind, CMU_simulation 
+from data import CMU_simulation 
 from torch.utils.data import DataLoader, Dataset
 
 class ResNetBlock(nn.Module):
@@ -107,16 +107,44 @@ def loss_l1(pred_distance, gt_distance, clamp=0.1):
     loss = l1_loss(pred_distance, gt_distance)
     return loss
 
+def loss_l2(pred_distance, gt_distance, clamp=0.1):
+    l2_loss = nn.MSELoss()
+    pred_distance = torch.clamp(pred_distance, -clamp, clamp)
+    gt_distance = torch.clamp(gt_distance, -clamp, clamp)
+    loss = l2_loss(pred_distance, gt_distance)
+    return loss
+
+# batched laplacian loss
+def loss_laplacian(laplacian_matrix:torch.Tensor, pred_vertices:torch.Tensor, gt_vertices:torch.Tensor, ratio=0.1):
+    laplacian_loss = nn.MSELoss()
+    # assert pred_vertices shape == gt_vertices shape
+    assert pred_vertices.shape == gt_vertices.shape # shape : batch_size, seq_length, num_vertices*3
+    # reshape pred_vertices and gt_vertices to batch_size*seq_length, num_vertices*3
+    pred_vertices = pred_vertices.view(-1, pred_vertices.shape[2])
+    gt_vertices = gt_vertices.view(-1, gt_vertices.shape[2])
+    #print(f' gt_vertices : {gt_vertices}')
+    #print(f' pred_vertices : {pred_vertices}')
+    #print(f' laplacian_matrix : {laplacian_matrix}')
+    laplacian_pred = torch.matmul(pred_vertices, laplacian_matrix)
+    laplacian_gt = torch.matmul(gt_vertices, laplacian_matrix)
+    #print(f' laplacian pred : {laplacian_pred}')
+    #print(f' laplacian gt : {laplacian_gt}')
+    laplacian_loss = laplacian_loss(laplacian_pred,laplacian_gt)
+    #print(f' laplsaian loss : {laplacian_loss}')
+    vertex_loss = loss_l2(pred_vertices, gt_vertices)
+    return ratio * laplacian_loss + (1-ratio) * vertex_loss
+
 
 if __name__=='__main__':
     # load data
     dataset = CMU_simulation('/home/cxh/tmp/CMU_mini_dataset')
-    template_vertices = torch.tensor(dataset.template_vertices, dtype=torch.float32,device='cuda')
+    template_vertices = dataset.template_vertices.to(device='cuda')
     template_faces = dataset.template_faces
+    laplacian_matrix = dataset.laplacian_matrix.to(device='cuda')
 
     input_dim = 181
     output_dim = 2590*3
-    batch_size = 8 
+    batch_size = 8
     seq_length = 130
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
     num_epoches = 15000
@@ -126,22 +154,30 @@ if __name__=='__main__':
     gru = GRU(input_dim=input_dim, hidden_dim=512, num_layers=8, output_dim=output_dim).to('cuda')
     print(f' gru model : {gru}')
     optimizer = torch.optim.Adam(gru.parameters(), lr=1.0e-5)
-    critrion = nn.MSELoss()
+    critrion = loss_laplacian
     # Train the model
     for epoch in range(num_epoches):
         running_loss = 0.0
         for i, data in enumerate(dataloader):
             # reshape data to batch_size, seq_length, input_dim
             gender, poses, vertex_seq = data
-            vertex_seq = vertex_seq.view(-1, seq_length, 7770).to(device='cuda')
+            #print(f' ----vertex_seq shape : {vertex_seq.shape}')
+            vertex_seq = vertex_seq.to(device='cuda')
+            #vertex_seq = vertex_seq.view(-1, seq_length, 7770).to(device='cuda')
             poses = poses.to(device='cuda')
             # reshape beta from batch_size, 16 to batch_size, sequence_length, 16
             optimizer.zero_grad()
             output = gru(poses)
+            # reshape output as vertex_seq
+            output = output.view_as(vertex_seq)
             #print(f' out shape : {output.shape}')
-            loss = critrion(output, vertex_seq)
+            #print(f' ground truth shape : {vertex_seq.shape}')
+            #loss_lap = loss_laplacian(laplacian_matrix, output, vertex_seq)
+            #print(f' laplacian loss : {loss_lap}')
+            loss = critrion(laplacian_matrix, output, vertex_seq)
             running_loss += loss.item()
-
+            #print(f' loss : {loss }')
+            #print(f' i : {i} loss : {loss.item()}')
             if i % 10 == 9:
                 print(f'[{epoch + 1}, {i + 1}] loss: {running_loss / 10}')
                 running_loss = 0.0
@@ -150,7 +186,7 @@ if __name__=='__main__':
             optimizer.step()
 
         # save model for every 100 epoches
-        if epoch % 100 == 99:
-            torch.save(gru.state_dict(), '/home/cxh/tmp/checkpoint/gru_{0:0>3}.pth'.format((epoch-99)//100))
+        #if epoch % 100 == 99:
+        #   torch.save(gru.state_dict(), '/home/cxh/tmp/checkpoint/gru_{0:0>3}.pth'.format((epoch-99)//100))
         
     print('Done')
