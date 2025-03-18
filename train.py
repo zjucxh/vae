@@ -36,7 +36,7 @@ class Trainer:
                     running_loss = 0.0
                     self.validate(val_loader, epoch * len(train_loader) + i)
             if epoch % 100 == 99:
-                self.save(f'~/tmp/checkpoint/gru/gru_{(epoch-99)//100}.pth')
+                self.save(f'/home/cxh/tmp/checkpoint/gru/gru_{(epoch-99)//100}.pth')
         self.writer.flush()
         self.writer.close()
 
