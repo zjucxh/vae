@@ -2,8 +2,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
-from torchvision.models import resnet18
-from pytorch3d.loss import chamfer_distance
 from data import CMU_simulation 
 from torch.utils.data import DataLoader, Dataset
 
@@ -109,8 +107,8 @@ def loss_l1(pred_distance, gt_distance, clamp=0.1):
 
 def loss_l2(pred_distance, gt_distance, clamp=0.1):
     l2_loss = nn.MSELoss()
-    pred_distance = torch.clamp(pred_distance, -clamp, clamp)
-    gt_distance = torch.clamp(gt_distance, -clamp, clamp)
+    #pred_distance = torch.clamp(pred_distance, -clamp, clamp)
+    #gt_distance = torch.clamp(gt_distance, -clamp, clamp)
     loss = l2_loss(pred_distance, gt_distance)
     return loss
 
