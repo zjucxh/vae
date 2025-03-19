@@ -32,11 +32,12 @@ class CMU_simulation(Dataset):
         self.data = []
         self.normals = []
         self.gender = 0
-        # load all data sequences
+        # load all data sequences, the data contains:
+        # gender(female, male, str), betas smpl shape parameters
+        # poses smpl pose parameters
         for i in range(self.dataset_length):
             seq = np.load(self.npz_files[i])
             self.data.append(seq)
-        #print(f' dataset_length: {self.dataset_length}')
         
         # Compute vertex normals given vertex_seq and template faces
         #self.compute_vertex_normals()
