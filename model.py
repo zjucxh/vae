@@ -86,6 +86,39 @@ class GRU(nn.Module):
         out = self.fc(out)
         return out
 
+# TODO Define Nerual Level Set Model
+class NLS(nn.Module):
+    def __init__(self, input_dim, hidden_dim, num_layers=4, output_dim=1):
+        super(NLS, self).__init__()
+        r"""
+        Args:
+            input_dim: int, the input dimension of NLS
+            hidden_dim: int, the number of hidden units in the GRU
+            num_layers: int, the number of layers in the GRU
+            output_dim: int, the output dimension of NLS
+        """
+        # The input dimension of NLS is (B, S, D),
+        # where B is the batch size, S is the sequence length, and D is the input dimension.
+        # The hidden dimension is the number of hidden units in the GRU.
+        # The output dimension is 1 as the output of NLS is signed distance(scalar) for each vertex.
+        self.input_dim = input_dim
+        self.hidden_dim = hidden_dim
+        self.output_dim = output_dim
+        self.num_layers = num_layers
+        self.gru = nn.GRU(input_dim, hidden_dim, num_layers, batch_first=True)
+        self.fc = nn.Linear(hidden_dim, output_dim)
+
+    def forward(self, vertices, poses):
+        # The input of NLS is the concatenation of vertices and poses.
+        # vertices is the vertex sequence with shape (B, S, V*3),
+        # where B is the batch size, S is the sequence length, and V is the number of vertices.
+        # The poses is the pose sequence with shape (B, S, pose_dim), pose_dim is 181
+        x = torch.cat([vertices, poses], dim=-1)
+        h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_dim).to('cuda')
+        out, _ = self.gru(x, h0)
+        out = self.fc(out)
+        return out
+
 # Define the loss function for the VAE
 def vae_loss(recon_x, x, mu, logvar):
     # Reconstruction loss
