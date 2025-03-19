@@ -123,5 +123,5 @@ def signed_distance(mesh:trimesh.Trimesh, points:np.ndarray,eps:float=1e-5):
         elif boundary_distance[i] < eps:  # the point is on the boundary
             signed_distance[i] = 0
         else:  # the point is inside the mesh
-            signed_distance[i] = -boundary_distance[i]
+            signed_distance[i] = -mesh_distance[i]
     return signed_distance
