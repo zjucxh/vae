@@ -105,11 +105,9 @@ def loss_l1(pred_distance, gt_distance, clamp=0.1):
     loss = l1_loss(pred_distance, gt_distance)
     return loss
 
-def loss_l2(pred_distance, gt_distance, clamp=0.1):
+def loss_l2(pred, gt):
     l2_loss = nn.MSELoss()
-    #pred_distance = torch.clamp(pred_distance, -clamp, clamp)
-    #gt_distance = torch.clamp(gt_distance, -clamp, clamp)
-    loss = l2_loss(pred_distance, gt_distance)
+    loss = l2_loss(pred, gt)
     return loss
 
 # batched laplacian loss
