@@ -101,7 +101,7 @@ def train_pinn():
 
 # 训练并可视化结果
 if __name__ == "__main__":
-    #model = train_pinn()
+    model = train_pinn()
     
     # 测试数据
     x_test = torch.linspace(-1, 1, 100).view(-1, 1)
@@ -109,17 +109,17 @@ if __name__ == "__main__":
     X, T = torch.meshgrid(x_test.squeeze(), t_test.squeeze())
     x_flat = X.reshape(-1, 1)
     t_flat = T.reshape(-1, 1)
-    print('x_flat : {0}'.format(x_flat))
-    print('t_flat : {0}'.format(t_flat)) 
+    print('x_flat : {0}'.format(x_flat.shape))
+    print('t_flat : {0}'.format(t_flat.shape)) 
     # 预测
-    #with torch.no_grad():
-    #    u_pred = model(x_flat, t_flat).numpy().reshape(100, 100)
+    with torch.no_grad():
+        u_pred = model(x_flat, t_flat).numpy().reshape(100, 100)
     
-    ## 可视化
-    #plt.figure(figsize=(10, 6))
-    #plt.contourf(X.numpy(), T.numpy(), u_pred, levels=50, cmap='jet')
-    #plt.colorbar()
-    #plt.xlabel('x')
-    #plt.ylabel('t')
-    #plt.title('PINN Solution for Burgers Equation')
-    #plt.show()
+    # 可视化
+    plt.figure(figsize=(10, 6))
+    plt.contourf(X.numpy(), T.numpy(), u_pred, levels=50, cmap='jet')
+    plt.colorbar()
+    plt.xlabel('x')
+    plt.ylabel('t')
+    plt.title('PINN Solution for Burgers Equation')
+    plt.show()

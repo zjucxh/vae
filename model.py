@@ -5,7 +5,7 @@ from torch.autograd.functional import jacobian
 from data import CMU_simulation 
 from torch.utils.data import DataLoader, Dataset
 
-# TODO construct the neural level set model
+# Construct the neural level set model
 class NeuralLevelSet(nn.Module):
     def __init__(self, input_dim, hidden_dim, num_layers=4, output_dim=1):
         super(NeuralLevelSet, self).__init__()
@@ -17,9 +17,21 @@ class NeuralLevelSet(nn.Module):
         # The GRU module take input_dim dimension as input, the 181 is the pose parameters, the 3*n is the initial guess of the vertices
         self.gru = nn.GRU(input_size=input_dim, hidden_size=hidden_dim, num_layers=num_layers, batch_first=True )
         self.fc = nn.Linear(hidden_dim, output_dim) 
-    def forward(self, x):
-        h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_dim).to('cuda')
-        out, _ = self.gru(x, h0)
+
+        # construct velocity field via nesnet 
+        self.velocity_field = nn.Sequential(
+            nn.Linear(3, 256),
+            nn.Tanh(),
+            nn.Linear(256, 256),
+            nn.Tanh(),
+            nn.Linear(256, 3)
+        )
+
+    def forward(self, x, theta):
+        input = torch.cat((x, theta), dim=2)
+        h0 = torch.zeros(self.num_layers, input.size(0), self.hidden_dim).to('cuda')
+        print('input size : {0}'.format(input.size(0)))
+        out, _ = self.gru(input, h0)
         out = self.fc(out)
         return out
 
@@ -38,7 +50,7 @@ class GRU(nn.Module):
     def forward(self, x):
         h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_dim).to('cuda')
         # set h0 with normal distribution with u = 0, sigma = 0.1
-        ho = self.h0
+        #ho = self.h0
         #print(f' h0 shape : {h0.shape}')
         out, _ = self.gru(x, h0)
         #out = self.fc(out[:,-1,:])
@@ -124,25 +136,23 @@ if __name__=='__main__':
             poses = poses.to(device='cuda')
             print('poses : {0}'.format(poses.shape)) # shape : batch_size, seq_length, 181
             # concatenate poses with initial vertex guess
-            inputs = torch.cat((poses, initial_vertex_guess.repeat(poses.shape[0], seq_length, 1)), dim=2)
-            inputs = inputs.to(device='cuda')
-            inputs.requires_grad = True
-            print('inputs : {0}'.format(inputs))
-            print('inputs : {0}'.format(inputs.shape))
-            
-            output = neural_levelset(inputs)
+            x = initial_vertex_guess.repeat(poses.shape[0], seq_length, 1)
+            x.requires_grad = True
+            poses.requires_grad = True
+            output = neural_levelset(x, poses)
+
+            # compute grad
             loss = output.pow(2).mean()
-            loss.backward()
+            y_xt = torch.autograd.grad(loss, [x, poses], create_graph=True)
+            print('y_x : {0}'.format(y_xt[0].shape))
+            print('y_t : {0}'.format(y_xt[1].shape))
+
             print('output : {0}'.format(output.shape))
             # padded temporal difference
-            diff = torch.cat([torch.zeros(output.shape[0], 1, 1, device='cuda'),torch.diff(output, dim=1)], dim=1)
-            print('diff : {0}'.format(diff))
                 
             #output.pow(2).mean().backward()
-            input_grad = inputs.grad
             #jacobian_matrix = jacobian(neural_levelset, inputs)
             #print('jacobian_matrix : {0}'.format(jacobian_matrix.shape))
-            print('input_grad : {0}'.format(input_grad))
 
         # save model for every 100 epoches
         #if epoch % 100 == 99:
