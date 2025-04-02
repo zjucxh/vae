@@ -139,6 +139,7 @@ def loss_laplacian(laplacian_matrix:torch.Tensor, pred_vertices:torch.Tensor, gt
     return ratio * laplacian_loss + (1-ratio) * vertex_loss
 
 # Define NLS loss
+# Wip: Clone and detach input data for gradient computation
 def loss_nls(model, gt_sdf,t, poses, sampled_vertex):
     t.requires_grad_(True)
     sampled_vertex.requires_grad_(True)
