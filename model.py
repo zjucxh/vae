@@ -145,11 +145,25 @@ def loss_nls(model, gt_sdf,t, poses, sampled_vertex):
     sampled_vertex.requires_grad_(True)
     poses.requires_grad_(True)
     
-    pred_sdf, ff = model(t, poses, sampled_vertex)
-
     # compute the signed distance loss
+    pred_sdf, _ = model(t, poses, sampled_vertex)
     sdf_loss = loss_l1(pred_sdf, gt_sdf)
+
     # compute level set constraint loss \partial_t \phi + \nabla \phi \cdot f = 0
+    t_l = t.clone().detach()
+    poses_l = poses.clone().detach()
+    sampled_vertex_l = sampled_vertex.clone().detach()
+    #t_l.requires_grad_(True)
+    #poses_l.requires_grad_(True)
+    sampled_vertex_l.requires_grad_(True)
+    pred_sdf_l, ff = model(t_l, poses_l, sampled_vertex_l)
+    # compute the gradient of pred_sdf with respect to t, poses and sampled_vertex
+    sdf_t, _, sdf_x = torch.autograd.grad(pred_sdf_l, [t_l, poses_l, sampled_vertex_l], grad_outputs=torch.ones_like(pred_sdf_l), create_graph=True)
+    # level set constraints
+    nibla = torch.sum(sdf_x * ff, dim=-1).unsqueeze(dim=-1)
+    level_set_loss = torch.mean(sdf_t + nibla)
+    # overall loss
+    overall_loss = sdf_loss + level_set_loss
     #sdf_t, _, sdf_x = torch.autograd.grad(pred_sdf, [t, poses, sampled_vertex], grad_outputs=torch.ones_like(pred_sdf), create_graph=True)
     ##print(f' sdf_t shape : {sdf_t.shape}')
     ##print(f' sdf_x shape : {sdf_x.shape}')
@@ -159,7 +173,7 @@ def loss_nls(model, gt_sdf,t, poses, sampled_vertex):
     ##print(f' nibla : {nibla.shape}')
     #level_set_loss = torch.mean(sdf_t + nibla)
     #overall_loss = sdf_loss + level_set_loss
-    return sdf_loss
+    return overall_loss
 
 
 
