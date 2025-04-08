@@ -58,7 +58,7 @@ class NLS(nn.Module):
         self.hidden_dim = hidden_dim
         self.output_dim = output_dim
         self.num_layers = num_layers
-        self.force_field = ForceField(input_dim-1, num_layers=6, output_dim=3).to(device='cuda') # exclude time dimension
+        #self.force_field = ForceField(input_dim-1, num_layers=6, output_dim=3).to(device='cuda') # exclude time dimension
         self.gru = nn.GRU(input_dim, hidden_dim, num_layers, batch_first=True)
         self.fc = nn.Linear(hidden_dim, output_dim)
 
@@ -68,13 +68,13 @@ class NLS(nn.Module):
         # where B is the batch size, S is the sequence length, and V is the number of vertices.
         # The poses is the pose sequence with shape (B, S, pose_dim), pose_dim is 181
         x0 = torch.cat([t, poses,vertices], dim=-1).to(device='cuda')  # input of NLS
-        x1 = torch.cat([poses, vertices], dim=-1).to(device='cuda') # input of force field
+        #x1 = torch.cat([poses, vertices], dim=-1).to(device='cuda') # input of force field
         h0 = torch.zeros(self.num_layers, x0.size(0), self.hidden_dim).to('cuda')
         out, _ = self.gru(x0, h0) 
         sdist = self.fc(out)# output of signed distance
         # feed the force field to the model
-        ff = self.force_field(x1)
-        return sdist, ff
+        #ff = self.force_field(x1)
+        return sdist
     
 # TODO define Forcefield Model 
 class ForceField(nn.Module):
@@ -95,9 +95,10 @@ class ForceField(nn.Module):
         self.encoder = nn.TransformerEncoder(self.transformer, num_layers=num_layers) # transformer encoder based on paper "Attention is all you need"
         self.fc = nn.Linear(input_dim, output_dim)
 
-    def forward(self, x):
+    def forward(self, poses, vertices):
         # The input of the model is the concatenation of SMPL parameters and vertex sequence.
         # x is the input with shape (B, S, D), where B is the batch size, S is the sequence length, and D is the input dimension.
+        x = torch.cat([poses, vertices], dim=-1).to(device='cuda')  # input of force field
         out = self.encoder(x)
         out = self.fc(out)
         return out
@@ -139,40 +140,21 @@ def loss_laplacian(laplacian_matrix:torch.Tensor, pred_vertices:torch.Tensor, gt
     return ratio * laplacian_loss + (1-ratio) * vertex_loss
 
 # Define NLS loss
-# Wip: Clone and detach input data for gradient computation
+# Wip: solve backward problem
 def loss_nls(model, gt_sdf,t, poses, sampled_vertex):
     t.requires_grad_(True)
     sampled_vertex.requires_grad_(True)
     poses.requires_grad_(True)
     
     # compute the signed distance loss
-    pred_sdf, _ = model(t, poses, sampled_vertex)
+    pred_sdf = model(t, poses, sampled_vertex)
     sdf_loss = loss_l1(pred_sdf, gt_sdf)
 
-    # compute level set constraint loss \partial_t \phi + \nabla \phi \cdot f = 0
-    t_l = t.clone().detach()
-    poses_l = poses.clone().detach()
-    sampled_vertex_l = sampled_vertex.clone().detach()
-    #t_l.requires_grad_(True)
-    #poses_l.requires_grad_(True)
-    sampled_vertex_l.requires_grad_(True)
-    pred_sdf_l, ff = model(t_l, poses_l, sampled_vertex_l)
-    # compute the gradient of pred_sdf with respect to t, poses and sampled_vertex
-    sdf_t, _, sdf_x = torch.autograd.grad(pred_sdf_l, [t_l, poses_l, sampled_vertex_l], grad_outputs=torch.ones_like(pred_sdf_l), create_graph=True)
-    # level set constraints
-    nibla = torch.sum(sdf_x * ff, dim=-1).unsqueeze(dim=-1)
-    level_set_loss = torch.mean(sdf_t + nibla)
+    # compute level set constraint loss 
+    
     # overall loss
-    overall_loss = sdf_loss + level_set_loss
-    #sdf_t, _, sdf_x = torch.autograd.grad(pred_sdf, [t, poses, sampled_vertex], grad_outputs=torch.ones_like(pred_sdf), create_graph=True)
-    ##print(f' sdf_t shape : {sdf_t.shape}')
-    ##print(f' sdf_x shape : {sdf_x.shape}')
-    ##print(f' ff shape : {ff.shape}')
-    ## level set constraints loss
-    #nibla = torch.sum(sdf_x * ff, dim=-1).unsqueeze(dim=-1)
-    ##print(f' nibla : {nibla.shape}')
-    #level_set_loss = torch.mean(sdf_t + nibla)
-    #overall_loss = sdf_loss + level_set_loss
+    overall_loss = sdf_loss 
+    
     return overall_loss
 
 
@@ -184,7 +166,7 @@ if __name__=='__main__':
     template_faces = dataset.template_faces
     laplacian_matrix = dataset.laplacian_matrix.to(device='cuda')
 
-    input_dim = 181 + 3 + 1
+    input_dim = 181 + 3 + 1 # pose_dim + vertex_dim + time_dim
     output_dim = 3
     batch_size = 8
     seq_length = 130
@@ -212,13 +194,17 @@ if __name__=='__main__':
             
             rand_idx = torch.randint(0, 2590, size=(1,))
             sampled_vertex = vertex_seq[:, :,0].to(device='cuda')
-            #print(f' sampled index : {rand_idx}')
 
-            # generate time data shaped with (B, S, 1)
-            t = torch.ones(poses.shape[0], seq_length, 1).to(device='cuda')
+            # generate time data shaped with (B, S, 1) in linear space
+            #t = torch.ones(poses.shape[0], seq_length, 1).to(device='cuda')
+            t = torch.linspace(0, 1, seq_length).repeat(poses.shape[0], 1).unsqueeze(-1).to(device='cuda')
             poses = poses.to(device='cuda')
-            gt_sdf = torch.zeros(poses.shape[0], seq_length, 1).to(device='cuda')
-            
+            gt_sdf = torch.zeros(poses.shape[0], seq_length, 1).to(device='cuda') 
+            #print(' gt_sdf shape : {0}'.format(gt_sdf.shape))
+            #print(' t shape : {0}'.format(t))
+            #print(' poses shape : {0}'.format(poses.shape))
+            #print(' sampled_vertex shape : {0}'.format(sampled_vertex.shape))
+
             # compute loss
             loss = loss_nls(nls, gt_sdf, t, poses, sampled_vertex)
 
@@ -226,6 +212,11 @@ if __name__=='__main__':
             loss.backward()
             optimizer.step()
             print(f' epoch : {epoch}, loss : {loss.item()}')
+            # save model every 1000 epochs  
+            if epoch % 1000 == 999:
+                torch.save(nls.state_dict(), '/home/cxh/tmp/checkpoint/nls/nls_{0:0>3}.pth'.format((epoch-999)//1000))
+
+
 
 
         
