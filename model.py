@@ -4,7 +4,8 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 from data import CMU_simulation 
 from torch.utils.data import DataLoader, Dataset
-
+from utils import signed_distance
+from loss import loss_signed_distance
 class ResNetBlock(nn.Module):
     def __init__(self, dim):
         super(ResNetBlock, self).__init__()
@@ -105,39 +106,7 @@ class ForceField(nn.Module):
     
 
 
-# loss_l1
-def loss_l1(pred_distance, gt_distance, clamp=0.1):
-    l1_loss = nn.L1Loss()
-    #print(f' pred distance : {pred_distance}')
-    #pred_distance = torch.clamp(pred_distance, -clamp, clamp)
-    #gt_distance = torch.clamp(gt_distance, -clamp, clamp)
-    loss = l1_loss(pred_distance, gt_distance)
-    return loss
 
-def loss_l2(pred, gt):
-    l2_loss = nn.MSELoss()
-    loss = l2_loss(pred, gt)
-    return loss
-
-# batched laplacian loss
-def loss_laplacian(laplacian_matrix:torch.Tensor, pred_vertices:torch.Tensor, gt_vertices:torch.Tensor, ratio=0.1):
-    laplacian_loss = nn.MSELoss()
-    # assert pred_vertices shape == gt_vertices shape
-    assert pred_vertices.shape == gt_vertices.shape # shape : batch_size, seq_length, num_vertices*3
-    # reshape pred_vertices and gt_vertices to batch_size*seq_length, num_vertices*3
-    pred_vertices = pred_vertices.view(-1, pred_vertices.shape[2])
-    gt_vertices = gt_vertices.view(-1, gt_vertices.shape[2])
-    #print(f' gt_vertices : {gt_vertices}')
-    #print(f' pred_vertices : {pred_vertices}')
-    #print(f' laplacian_matrix : {laplacian_matrix}')
-    laplacian_pred = torch.matmul(pred_vertices, laplacian_matrix)
-    laplacian_gt = torch.matmul(gt_vertices, laplacian_matrix)
-    #print(f' laplacian pred : {laplacian_pred}')
-    #print(f' laplacian gt : {laplacian_gt}')
-    laplacian_loss = laplacian_loss(laplacian_pred,laplacian_gt)
-    #print(f' laplsaian loss : {laplacian_loss}')
-    vertex_loss = loss_l2(pred_vertices, gt_vertices)
-    return ratio * laplacian_loss + (1-ratio) * vertex_loss
 
 # Define NLS loss
 # Wip: solve backward problem
@@ -148,7 +117,7 @@ def loss_nls(model, gt_sdf,t, poses, sampled_vertex):
     
     # compute the signed distance loss
     pred_sdf = model(t, poses, sampled_vertex)
-    sdf_loss = loss_l1(pred_sdf, gt_sdf)
+    sdf_loss = loss_signed_distance(pred_sdf, gt_sdf)
 
     # compute level set constraint loss 
     
@@ -200,10 +169,11 @@ if __name__=='__main__':
             t = torch.linspace(0, 1, seq_length).repeat(poses.shape[0], 1).unsqueeze(-1).to(device='cuda')
             poses = poses.to(device='cuda')
             gt_sdf = torch.zeros(poses.shape[0], seq_length, 1).to(device='cuda') 
-            #print(' gt_sdf shape : {0}'.format(gt_sdf.shape))
-            #print(' t shape : {0}'.format(t))
-            #print(' poses shape : {0}'.format(poses.shape))
-            #print(' sampled_vertex shape : {0}'.format(sampled_vertex.shape))
+            print(' gt_sdf shape : {0}'.format(gt_sdf.shape))
+            print(' t shape : {0}'.format(t.shape))
+            print(' poses shape : {0}'.format(poses.shape))
+            print(' sampled_vertex shape : {0}'.format(sampled_vertex.shape))
+            print(' vertex seq shape : {0}'.format(vertex_seq.shape))
 
             # compute loss
             loss = loss_nls(nls, gt_sdf, t, poses, sampled_vertex)
@@ -213,11 +183,6 @@ if __name__=='__main__':
             optimizer.step()
             print(f' epoch : {epoch}, loss : {loss.item()}')
             # save model every 1000 epochs  
-            if epoch % 1000 == 999:
-                torch.save(nls.state_dict(), '/home/cxh/tmp/checkpoint/nls/nls_{0:0>3}.pth'.format((epoch-999)//1000))
-
-
-
-
-        
+            #if epoch % 1000 == 999:
+            #    torch.save(nls.state_dict(), '/home/cxh/tmp/checkpoint/nls/nls_{0:0>3}.pth'.format((epoch-999)//1000))
     print('Done')
