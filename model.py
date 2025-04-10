@@ -141,6 +141,8 @@ if __name__=='__main__':
     seq_length = 130
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
     num_epoches = 15000
+    sampling_size = 512
+    num_obj_vertex = 2590
     
     # sample random vertex from the vertex sequence,
     #torch.manual_seed(0)
@@ -161,27 +163,28 @@ if __name__=='__main__':
             # reshape data to batch_size, seq_length, input_dim
             gender, poses, vertex_seq = data # vertex shape (B, S, num_v, 3)
             
-            rand_idx = torch.randint(0, 2590, size=(1,))
-            sampled_vertex = vertex_seq[:, :,0].to(device='cuda')
+            rand_idx = torch.randint(0, num_obj_vertex, size=(sampling_size,)) # sample random vertex from the vertex sequence
 
             # generate time data shaped with (B, S, 1) in linear space
             #t = torch.ones(poses.shape[0], seq_length, 1).to(device='cuda')
             t = torch.linspace(0, 1, seq_length).repeat(poses.shape[0], 1).unsqueeze(-1).to(device='cuda')
             poses = poses.to(device='cuda')
             gt_sdf = torch.zeros(poses.shape[0], seq_length, 1).to(device='cuda') 
-            print(' gt_sdf shape : {0}'.format(gt_sdf.shape))
-            print(' t shape : {0}'.format(t.shape))
-            print(' poses shape : {0}'.format(poses.shape))
-            print(' sampled_vertex shape : {0}'.format(sampled_vertex.shape))
-            print(' vertex seq shape : {0}'.format(vertex_seq.shape))
+            # compute ground truth signed distance function
+            # obtain sampled vertex from rand_idx
+            #sdf_vertex = vertex_seq[:, :,rand_idx]
 
-            # compute loss
-            loss = loss_nls(nls, gt_sdf, t, poses, sampled_vertex)
+            # compute loss for each sampling
+            running_loss = 0.0
+            for j in rand_idx:
+                sampled_vertex = vertex_seq[:, :,j].to(device='cuda')
+                loss = loss_nls(nls, gt_sdf, t, poses, sampled_vertex)
+                running_loss += loss
 
             # backward
-            loss.backward()
+            running_loss.backward()
             optimizer.step()
-            print(f' epoch : {epoch}, loss : {loss.item()}')
+            print(f' epoch : {epoch}, loss : {running_loss.item()}')
             # save model every 1000 epochs  
             #if epoch % 1000 == 999:
             #    torch.save(nls.state_dict(), '/home/cxh/tmp/checkpoint/nls/nls_{0:0>3}.pth'.format((epoch-999)//1000))
