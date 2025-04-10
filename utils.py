@@ -97,6 +97,7 @@ def boundary_vertices(mesh: trimesh.Trimesh):
     boundary_vertices = vertices[np.unique(boundary_edges.flatten())]
     return boundary_vertices
 
+
 def signed_distance(mesh:trimesh.Trimesh, points:np.ndarray,eps:float=1e-5):
     """
     Compute the signed distance between a mesh and a set of points.
@@ -108,9 +109,9 @@ def signed_distance(mesh:trimesh.Trimesh, points:np.ndarray,eps:float=1e-5):
         np.ndarray of shape (N,) with dtype=np.float32
     """
     # Compute the boundary edges 
-    boundary_edges = boundary_edges(mesh)
+    b_edges = boundary_edges(mesh)
     vertices = np.array(mesh.vertices,dtype=np.float32)
-    boundary_vertices = vertices[np.unique(boundary_edges.flatten())]
+    boundary_vertices = vertices[np.unique(b_edges.flatten())]
     boundary_distance = np.zeros(points.shape[0],dtype=np.float32)
     mesh_distance = np.zeros(points.shape[0],dtype=np.float32)
     mesh_distance = np.abs(trimesh.proximity.signed_distance(mesh, points))
@@ -119,9 +120,9 @@ def signed_distance(mesh:trimesh.Trimesh, points:np.ndarray,eps:float=1e-5):
     for i, point in enumerate(points):
         boundary_distance[i] = np.min(np.linalg.norm(boundary_vertices - point,axis=1))
         if boundary_distance[i] > eps and mesh_distance[i] > eps:  # the point is outside the mesh
-            signed_distance[i] = boundary_distance[i]
+            signed_distance[i] = mesh_distance[i]
         elif boundary_distance[i] < eps:  # the point is on the boundary
-            signed_distance[i] = 0
-        else:  # the point is inside the mesh
             signed_distance[i] = -boundary_distance[i]
+        else:  # the point is inside the mesh
+            signed_distance[i] = -mesh_distance[i]
     return signed_distance
