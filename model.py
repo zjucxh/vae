@@ -18,8 +18,9 @@ class ResNetBlock(nn.Module):
             nn.Linear(dim, dim)
         )
 
-    def forward(self, x):
-        return x + self.block(x)
+        # The GRU module take input_dim dimension as input, the 181 is the pose parameters, the 3*n is the initial guess of the vertices
+        self.gru = nn.GRU(input_size=input_dim, hidden_size=hidden_dim, num_layers=num_layers, batch_first=True )
+        self.fc = nn.Linear(hidden_dim, output_dim) 
 
 # Define Gated Recurrent Unit
 class GRU(nn.Module):
@@ -31,9 +32,11 @@ class GRU(nn.Module):
         self.num_layers = num_layers
         self.gru = nn.GRU(input_dim, hidden_dim, num_layers, batch_first=True)
         self.fc = nn.Linear(hidden_dim, output_dim)
-    
+        #self.h0 = torch.normal(0, 0.1, (self.num_layers, x.size(0), self.hidden_dim)).to('cuda')
     def forward(self, x):
         h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_dim).to('cuda')
+        # set h0 with normal distribution with u = 0, sigma = 0.1
+        #ho = self.h0
         #print(f' h0 shape : {h0.shape}')
         out, _ = self.gru(x, h0)
         #out = self.fc(out[:,-1,:])

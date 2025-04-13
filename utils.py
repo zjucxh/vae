@@ -97,6 +97,7 @@ def boundary_vertices(mesh: trimesh.Trimesh):
     boundary_vertices = vertices[np.unique(boundary_edges.flatten())]
     return boundary_vertices
 
+
 def signed_distance(mesh:trimesh.Trimesh, points:np.ndarray,eps:float=1e-5):
     """
     Compute the signed distance between a mesh and a set of points.
