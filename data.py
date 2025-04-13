@@ -105,5 +105,19 @@ def generate_noised_data():
              , template_vertices = template_vertices, noised_vertex_seq=noised_vertex_seq, signed_distance=sdist)
 
 if __name__ == '__main__':
+    # Initialize cmu simulation dataset
+    cmu_dataset = CMU_simulation()
+    # Data loader
+    dataloader = DataLoader(cmu_dataset, batch_size=8, shuffle=True)
+    # Iterate through the dataset
+    for i, data in enumerate(dataloader):
+        gender, poses, vertex_seq, noised_vertex_seq, signed_distance = data
+        # print data shape 
+        print(' gender shape : {0}'.format(gender.shape))
+        print(' poses shape : {0}'.format(poses.shape))
+        print(' vertex_seq shape : {0}'.format(vertex_seq.shape))
+        print(' noised_vertex_seq shape : {0}'.format(noised_vertex_seq.shape))
+        print(' signed_distance shape : {0}'.format(signed_distance.shape))
+
     print(' Done')
     
