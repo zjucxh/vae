@@ -62,8 +62,7 @@ class CMU_simulation(Dataset):
 
         return gender, poses, vertex_seq, noised_vertex_seq, signed_distance
 
-if __name__ == '__main__':
-    
+def generate_noised_data():
     # Load data 
     data = np.load('assets/data.npz')
     
@@ -104,3 +103,7 @@ if __name__ == '__main__':
     #Save to npz file
     np.savez(file='assets/data_noised.npz', gender=gender, poses=poses, vertex_seq=vertex_seq, template_faces = template_faces\
              , template_vertices = template_vertices, noised_vertex_seq=noised_vertex_seq, signed_distance=sdist)
+
+if __name__ == '__main__':
+    print(' Done')
+    
