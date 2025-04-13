@@ -175,3 +175,5 @@ assets/
 runs/vae/
 
 runs/gru/
+
+*.npz
