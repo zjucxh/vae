@@ -120,6 +120,10 @@ def loss_nls(model, gt_sdf,t, poses, sampled_vertex):
     
     # compute the signed distance loss
     pred_sdf = model(t, poses, sampled_vertex)
+    #print(' predicted sdf shape : {0}'.format(pred_sdf.shape))
+    #print(' gt sdf shape : {0}'.format(gt_sdf.shape))
+    # unsqueeze gt_sdf to (B, S, 1)
+    gt_sdf = gt_sdf.unsqueeze(-1)
     sdf_loss = loss_signed_distance(pred_sdf, gt_sdf)
 
     # compute level set constraint loss 
@@ -133,10 +137,10 @@ def loss_nls(model, gt_sdf,t, poses, sampled_vertex):
 
 if __name__=='__main__':
     # load data
-    dataset = CMU_simulation('/home/cxh/tmp/CMU_mini_dataset')
+    dataset = CMU_simulation('assets/data_noised.npz')
     template_vertices = dataset.template_vertices.to(device='cuda')
     template_faces = dataset.template_faces
-    laplacian_matrix = dataset.laplacian_matrix.to(device='cuda')
+    #laplacian_matrix = dataset.laplacian_matrix.to(device='cuda')
 
     input_dim = 181 + 3 + 1 # pose_dim + vertex_dim + time_dim
     output_dim = 3
@@ -164,15 +168,15 @@ if __name__=='__main__':
             # zero grad optimizer
             optimizer.zero_grad()
             # reshape data to batch_size, seq_length, input_dim
-            gender, poses, vertex_seq = data # vertex shape (B, S, num_v, 3)
-            
+            gender, poses, vertex_seq, noised_vertex_seq, signed_distance = data # vertex shape (B, S, num_v, 3)
+            print(' signed distance shape : {0}'.format(signed_distance.shape))
             rand_idx = torch.randint(0, num_obj_vertex, size=(sampling_size,)) # sample random vertex from the vertex sequence
 
             # generate time data shaped with (B, S, 1) in linear space
             #t = torch.ones(poses.shape[0], seq_length, 1).to(device='cuda')
             t = torch.linspace(0, 1, seq_length).repeat(poses.shape[0], 1).unsqueeze(-1).to(device='cuda')
             poses = poses.to(device='cuda')
-            gt_sdf = torch.zeros(poses.shape[0], seq_length, 1).to(device='cuda') 
+            #gt_sdf = torch.zeros(poses.shape[0], seq_length, 1).to(device='cuda') 
             # compute ground truth signed distance function
             # obtain sampled vertex from rand_idx
             #sdf_vertex = vertex_seq[:, :,rand_idx]
@@ -180,7 +184,12 @@ if __name__=='__main__':
             # compute loss for each sampling
             running_loss = 0.0
             for j in rand_idx:
-                sampled_vertex = vertex_seq[:, :,j].to(device='cuda')
+                sampled_vertex = noised_vertex_seq[:, :,j].to(device='cuda')
+                # unsqueeze signed distance to (B, S, num_sample, 1)
+                #signed_distance = signed_distance.unsqueeze(-1)
+                gt_sdf = signed_distance[:, :, j].to(device='cuda')
+                # print gt_sdf shape
+                print(' gt sdf shape : {0}'.format(gt_sdf.shape))
                 loss = loss_nls(nls, gt_sdf, t, poses, sampled_vertex)
                 running_loss += loss
 
