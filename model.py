@@ -7,6 +7,105 @@ from torch.utils.data import DataLoader, Dataset
 #from utils import signed_distance
 from loss import loss_signed_distance, loss_l2
 
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+class SDFPredictionTransformer(nn.Module):
+    def __init__(self, smpl_param_dim, transformer_hidden_dim, num_transformer_layers, num_heads, output_dim=1):
+        """
+        Initializes the SDF prediction network using a Transformer.
+
+        Args:
+            smpl_param_dim (int): Dimensionality of the SMPL pose parameters.
+            transformer_hidden_dim (int): Hidden dimension of the Transformer.
+            num_transformer_layers (int): Number of Transformer layers.
+            num_heads (int): Number of attention heads in the Transformer.
+            output_dim (int): Dimensionality of the output (SDF value). Defaults to 1.
+        """
+        super(SDFPredictionTransformer, self).__init__()
+
+        self.smpl_param_dim = smpl_param_dim
+        self.transformer_hidden_dim = transformer_hidden_dim
+        self.num_transformer_layers = num_transformer_layers
+        self.num_heads = num_heads
+
+        # Process SMPL parameters with a simple MLP
+        self.smpl_processor = nn.Sequential(
+            nn.Linear(smpl_param_dim, 256),
+            nn.ReLU(),
+            nn.Linear(256, 128),  # Reduced dimensionality before combining
+            nn.ReLU()
+        )
+
+        self.transformer_input_dim = 128 + 3 # Concatenate processed SMPL and vertex coords
+
+        # Linear layer to project the input to the transformer's hidden dimension
+        self.input_projection = nn.Linear(self.transformer_input_dim, transformer_hidden_dim)
+
+
+        # Transformer layer
+        self.tranum_sformer = nn.Transformer(
+            d_model=transformer_hidden_dim,
+            nhead=num_heads,
+            num_encoder_layers=num_transformer_layers,
+            num_decoder_layers=num_transformer_layers, # We'll use it as an encoder-only transformer
+            batch_first=True,  # Important: (batch, seq_len, features)
+        )
+
+        # Output layer: Predict SDF
+        self.sdf_predictor = nn.Sequential(
+            nn.Linear(transformer_hidden_dim, 64),
+            nn.ReLU(),
+            nn.Linear(64, output_dim),  # Predicts a single SDF value
+        )
+
+    def forward(self, smpl_params, vertex_sequence):
+        """
+        Predicts SDF values for a sequence of vertices, conditioned on SMPL pose parameters, using a Transformer.
+
+        Args:
+            smpl_params (torch.Tensor): SMPL pose parameters.
+                Shape: [batch_size, sequence_length, smpl_param_dim]
+            vertex_sequence (torch.Tensor): Sequence of vertex coordinates.
+                Shape: [batch_size, sequence_length, 3]
+
+        Returns:
+            torch.Tensor: Predicted SDF values for each vertex in the sequence.
+                Shape: [batch_size, sequence_length, 1]
+        """
+        batch_size, seq_len, _ = vertex_sequence.shape
+
+        # 1. Process SMPL parameters
+        smpl_features = self.smpl_processor(smpl_params) # [B, S, 128]
+
+
+        # 2. Concatenate SMPL features with each vertex in the sequence
+        combined_input = torch.cat([smpl_features, vertex_sequence], dim=-1)  # [B, S, 128 + 3]
+
+        # 3. Project input to the transformer's hidden dimension
+        transformer_input = self.input_projection(combined_input) # [B, S, transformer_hidden_dim]
+
+
+        # 4. Generate a mask to prevent attention to padding (if needed).  For simplicity, we assume no padding here.
+        #    If you have variable-length sequences, you'd need to create a src_key_padding_mask.
+        #    mask = torch.zeros(batch_size, seq_len).bool().to(smpl_params.device)  # Example mask
+
+        # 5. Run the Transformer
+        #    The Transformer takes the input sequence and an optional mask.
+        #    Here, we're using the Transformer as an encoder.  The output has the same shape as the input.
+        transformer_output = self.transformer(
+            src=transformer_input,
+            # src_key_padding_mask=mask, # Add this if you have padding
+        )  # [B, S, transformer_hidden_dim]
+
+
+        # 6. Predict SDF values
+        sdf_values = self.sdf_predictor(transformer_output)  # [B, S, 1]
+
+        return sdf_values
+
+
 # Define Gated Recurrent Unit
 class GRU(nn.Module):
     def __init__(self, input_dim, hidden_dim, num_layers=4, output_dim=289*3):
