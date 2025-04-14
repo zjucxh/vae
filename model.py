@@ -45,7 +45,7 @@ class SDFPredictionTransformer(nn.Module):
 
 
         # Transformer layer
-        self.tranum_sformer = nn.Transformer(
+        self.transformer = nn.Transformer(
             d_model=transformer_hidden_dim,
             nhead=num_heads,
             num_encoder_layers=num_transformer_layers,
@@ -75,6 +75,7 @@ class SDFPredictionTransformer(nn.Module):
                 Shape: [batch_size, sequence_length, 1]
         """
         batch_size, seq_len, _ = vertex_sequence.shape
+        #print(' vertex sequence length : {0}'.format(vertex_sequence.shape))
 
         # 1. Process SMPL parameters
         smpl_features = self.smpl_processor(smpl_params) # [B, S, 128]
@@ -87,20 +88,10 @@ class SDFPredictionTransformer(nn.Module):
         transformer_input = self.input_projection(combined_input) # [B, S, transformer_hidden_dim]
 
 
-        # 4. Generate a mask to prevent attention to padding (if needed).  For simplicity, we assume no padding here.
-        #    If you have variable-length sequences, you'd need to create a src_key_padding_mask.
-        #    mask = torch.zeros(batch_size, seq_len).bool().to(smpl_params.device)  # Example mask
+        # 4. Use the transformer in encoder-only mode
+        transformer_output = self.transformer.encoder(transformer_input)  # [B, S, transformer_hidden_dim]
 
-        # 5. Run the Transformer
-        #    The Transformer takes the input sequence and an optional mask.
-        #    Here, we're using the Transformer as an encoder.  The output has the same shape as the input.
-        transformer_output = self.transformer(
-            src=transformer_input,
-            # src_key_padding_mask=mask, # Add this if you have padding
-        )  # [B, S, transformer_hidden_dim]
-
-
-        # 6. Predict SDF values
+        # 5. Predict SDF values
         sdf_values = self.sdf_predictor(transformer_output)  # [B, S, 1]
 
         return sdf_values
@@ -190,42 +181,13 @@ class ForceField(nn.Module):
 # Define NLS loss
 # Wip: solve backward problem
 def loss_nls(model, gt_sdf,poses, sampled_vertex):
-    #t.requires_grad_(True)
-    #sampled_vertex.requires_grad_(True)
-    #poses.requires_grad_(True)
     
     # compute the signed distance loss
-    #with torch.backends.cudnn.flags(enabled=False):
     pred_sdf = model(poses, sampled_vertex)
-    #print(' predicted sdf shape : {0}'.format(pred_sdf.shape))
-    #print(' gt sdf shape : {0}'.format(gt_sdf.shape))
     # unsqueeze gt_sdf to (B, S, 1)
     gt_sdf = gt_sdf.unsqueeze(-1)
     sdf_loss = loss_signed_distance(pred_sdf, gt_sdf)
-
-    # Force field
-    #poses_f.requires_grad_(True)
-    #sampled_vertex_f.requires_grad_(True)
-    #ff = force_field(poses_f, sampled_vertex_f)
-
-    # level set constraints
-    #t_c.requires_grad_(True)
-    #poses_c.requires_grad_(True)
-    #sampled_vertex_c.requires_grad_(True)
-    #pred_sdf_c = model(t_c, poses_c, sampled_vertex_c)
-    # compute the gradient of pred_sdf_c with respect to sampled_vertex_c and t_c
-    #pred_sdf_c_grad = torch.autograd.grad(pred_sdf_c, [t_c, sampled_vertex_c], grad_outputs=torch.ones_like(pred_sdf_c), create_graph=True)
-    #grad_t = pred_sdf_c_grad[0]
-    #grad_v = pred_sdf_c_grad[1]
-    #print(' grad_t shape : {0}'.format(grad_t.shape))
-    ##print(' grad_v shape : {0}'.format(grad_v.shape))
-    ##print(' ff shape : {0}'.format(ff.shape))
-    # l2 loss 
-    #constraint_loss = loss_l2(grad_t, ff * grad_v)
-    #print(' ff shape : {0}'.format(ff.shape))
-    #print(' sampled_vertex_c shape {0}'.format(sampled_vertex_c.shape))
-
-    # overall loss
+    
     overall_loss = sdf_loss # + 0.4 * constraint_loss 
     
     return overall_loss
@@ -256,7 +218,9 @@ if __name__=='__main__':
     #force_field = ForceField(input_dim=input_dim-1, num_layers=16, output_dim=3).to(device='cuda') # exclude time dimension
 
     # Load NLS model
-    nls = NLS(input_dim, hidden_dim=256, num_layers=12, output_dim=1).to(device='cuda')
+    #nls = NLS(input_dim, hidden_dim=256, num_layers=12, output_dim=1).to(device='cuda')
+    # replace NLS with SDFPredictionTransformer
+    nls = SDFPredictionTransformer(smpl_param_dim=181, transformer_hidden_dim=256, num_transformer_layers=4, num_heads=8).to(device='cuda')
 
     optimizer = torch.optim.Adam(nls.parameters(), lr=1.0e-5)
     #critrion = loss_laplacian
@@ -309,7 +273,7 @@ if __name__=='__main__':
                 # backward
                 optimizer.step()
         # print running loss
-        print(' epoch : {0}, running loss : {1}'.format(epoch, running_loss))
+        #print(' epoch : {0}, running loss : {1}'.format(epoch, running_loss))
                 
             # save model every 1000 epochs  
             #if epoch % 1000 == 999:
