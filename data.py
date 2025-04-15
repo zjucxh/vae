@@ -56,8 +56,8 @@ class CMU_simulation(Dataset):
         """
         gender = self.gender[index]
         poses = torch.tensor(self.poses[index], dtype=torch.float32)
-        vertex_seq = self.vertex_seq[index]
-        noised_vertex_seq = self.noised_vertex_seq[index]
+        vertex_seq = self.vertex_seq[index] + self.template_vertices
+        noised_vertex_seq = self.noised_vertex_seq[index] + self.template_vertices
         signed_distance = self.signed_distance[index]
 
         return gender, poses, vertex_seq, noised_vertex_seq, signed_distance
@@ -107,17 +107,15 @@ def generate_noised_data():
 if __name__ == '__main__':
     # Initialize cmu simulation dataset
     cmu_dataset = CMU_simulation()
-    # Data loader
-    dataloader = DataLoader(cmu_dataset, batch_size=8, shuffle=True)
-    # Iterate through the dataset
-    for i, data in enumerate(dataloader):
-        gender, poses, vertex_seq, noised_vertex_seq, signed_distance = data
-        # print data shape 
-        print(' gender shape : {0}'.format(gender.shape))
-        print(' poses shape : {0}'.format(poses.shape))
-        print(' vertex_seq shape : {0}'.format(vertex_seq.shape))
-        print(' noised_vertex_seq shape : {0}'.format(noised_vertex_seq.shape))
-        print(' signed_distance shape : {0}'.format(signed_distance.shape))
+    _, _, _, vertex_seq,_ = cmu_dataset[44]
+    template_faces = cmu_dataset.template_faces
+    # compose vertex sequence and template faces
+    for j in range(cmu_dataset.sequence_length):
+
+        mesh = trimesh.Trimesh(vertices=vertex_seq[j], faces=cmu_dataset.template_faces)
+        # write obj file to assets
+        mesh.export('assets/seq/vertex_seq_{0}.obj'.format(j))
+
 
     print(' Done')
     
