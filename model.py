@@ -11,7 +11,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-class SDFPredictionTransformer(nn.Module):
+class PredictionTransformer(nn.Module):
     def __init__(self, smpl_param_dim, transformer_hidden_dim, num_transformer_layers, num_heads, output_dim=1):
         """
         Initializes the SDF prediction network using a Transformer.
@@ -23,7 +23,7 @@ class SDFPredictionTransformer(nn.Module):
             num_heads (int): Number of attention heads in the Transformer.
             output_dim (int): Dimensionality of the output (SDF value). Defaults to 1.
         """
-        super(SDFPredictionTransformer, self).__init__()
+        super(PredictionTransformer, self).__init__()
 
         self.smpl_param_dim = smpl_param_dim
         self.transformer_hidden_dim = transformer_hidden_dim
@@ -219,8 +219,8 @@ if __name__=='__main__':
 
     # Load NLS model
     #nls = NLS(input_dim, hidden_dim=256, num_layers=12, output_dim=1).to(device='cuda')
-    # replace NLS with SDFPredictionTransformer
-    nls = SDFPredictionTransformer(smpl_param_dim=181, transformer_hidden_dim=256, num_transformer_layers=4, num_heads=8).to(device='cuda')
+    # replace NLS with PredictionTransformer
+    nls = PredictionTransformer(smpl_param_dim=181, transformer_hidden_dim=256, num_transformer_layers=4, num_heads=8).to(device='cuda')
 
     optimizer = torch.optim.Adam(nls.parameters(), lr=1.0e-5)
     #critrion = loss_laplacian
