@@ -16,6 +16,7 @@ class Trainer:
         for epoch in range(num_epochs):
             self.model.train()
             running_loss = 0.0
+            n_iter = 0
             for i, data in enumerate(train_loader):
                 gender, poses, vertex_seq, _, _ = data
                 poses = poses.to(self.device)  # Transformer input
@@ -28,12 +29,13 @@ class Trainer:
                 self.optimizer.step()
 
                 running_loss += loss.item()
-                if i % 10 == 9:
-                    print(f'[{epoch + 1}, {i + 1}] loss: {running_loss / 10}')
-                    self.writer.add_scalars('Loss', {'Train Transformer': running_loss / 10},
-                                            epoch * len(train_loader) + i)
-                    running_loss = 0.0
-                    self.validate(val_loader, epoch * len(train_loader) + i)
+                n_iter += 1
+
+            print('Epoch : {0}, Loss : {1}'.format(epoch, running_loss / n_iter))
+            self.writer.add_scalars('Loss', {'Train Transformer': running_loss / n_iter},
+                                    epoch * len(train_loader) + i)
+            running_loss = 0.0
+            #self.validate(val_loader, epoch * len(train_loader) + i)
             if epoch % 100 == 99:
                 self.save('/home/cxh/tmp/checkpoint/transformer/transformer_{0:0>4}.pth'.format((epoch-99)//100))
         self.writer.flush()
@@ -67,6 +69,7 @@ if __name__ == '__main__':
     num_heads = 8
     output_dim = 2590 * 3  # Dimension of the output points
     lr = 1.0e-5 # Learning rate
+    num_epochs = 40000
 
     # Initialize the Transformer model
     transformer_model = PredictionTransformer(input_dim, transformer_hidden_dim, num_transformer_layers, num_heads, output_dim).to(device)
@@ -86,4 +89,4 @@ if __name__ == '__main__':
     trainer = Trainer(transformer_model, optimizer, criterion, device)
 
     # Train the model
-    trainer.train(train_loader, val_loader, num_epochs=40000)
+    trainer.train(train_loader, val_loader, num_epochs)
