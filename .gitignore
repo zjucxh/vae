@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# tensorboard log files
+runs/
+
 # C extensions
 *.so
 
@@ -175,3 +178,5 @@ assets/
 runs/vae/
 
 runs/gru/
+
+*.npz
